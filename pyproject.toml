@@ -24,3 +24,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[project.urls]
+Homepage = "https://github.com/lomalkin/busybar-tools"
+Issues = "https://github.com/lomalkin/busybar-tools/issues"
