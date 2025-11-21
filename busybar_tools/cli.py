@@ -1,0 +1,137 @@
+import os
+import sys
+import argparse
+import logging
+
+from busybar_tools import (
+    run_update_via_http,
+    run_clean,
+)
+
+from busybar_tools.helpers import (
+    setup_logging
+)
+
+from busybar_tools.config import (
+    DEVICE_IP,
+    DEVICE_IP_REF,
+    DEVICE_PORT,
+    U5_TARGET_HW,
+    U5_TARGET_HW_OPTIONS,
+    UPDATE_DEFAULT_BRANCH
+)
+
+def busybar_main():
+    logging.debug(f"cwd: {os.getcwd()}")
+
+    parser = argparse.ArgumentParser(description="Runner")
+    # parser.add_argument("-v", "--verbose", help="Verbose", action="store_true")
+    
+    parser.add_argument("-d", "--device", help="Device IP", type=str, default=DEVICE_IP, action="store")
+    parser.add_argument("-p", "--port", help="Device Port", type=int, default=DEVICE_PORT, action="store")
+    parser.add_argument("-t", "--target", help="Target hardware", type=int, default=U5_TARGET_HW, action="store", choices=U5_TARGET_HW_OPTIONS)
+    parser.add_argument("-n", "--no-action", help="No action, dry run", action="store_true")
+
+    parser.parse_known_args()
+
+    subparsers = parser.add_subparsers(
+        dest="command", help="Commands to run", required=False
+    )
+
+    p_run_update_http = subparsers.add_parser(
+        "update", help="Update firmware via HTTP API"
+    )
+    p_run_update_http.add_argument("branch", help="Branch to update", type=str, default=UPDATE_DEFAULT_BRANCH, nargs='?')
+    p_run_update_http.set_defaults(func=run_update_via_http)
+
+    p_clean = subparsers.add_parser(
+        "clean", help="Clean package's tmp directory"
+    )
+    p_clean.set_defaults(func=run_clean)
+
+    # CLI tool
+    # p_run_cli = subparsers.add_parser(
+    #     "cli", help="CLI terminal via Telnet"
+    # )
+    # p_run_cli.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
+    # p_run_cli.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
+    # p_run_cli.set_defaults(func=run_cli)
+
+    # p_flash_u5_dfu = subparsers.add_parser(
+    #     "flash-u5-dfu", help="Flash U5 firmware via DFU"
+    # )
+    # p_flash_u5_dfu.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
+    # p_flash_u5_dfu.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
+    # p_flash_u5_dfu.set_defaults(func=run_flash_u5_dfu)
+
+    # p_flash_si_uart = subparsers.add_parser(
+    #     "flash-si-uart", help="Flash SI917 firmware via UART"
+    # )
+    # p_flash_si_uart.add_argument("-s", "--serial_port", help="Serial port for SI917", type=str, default=None, required=False)
+    # p_flash_si_uart.add_argument("-f", "--firmware_path", help="Path to the SI917 firmware .rps file", type=str, default=None, required=False)
+    # p_flash_si_uart.set_defaults(func=run_flash_si_uart)
+
+    # p_flash_si_nwp_uart = subparsers.add_parser(
+    #     "flash-si-nwp-uart", help="Flash SI917 NWP firmware via UART"
+    # )
+    # p_flash_si_nwp_uart.add_argument("-s", "--serial_port", help="Serial port for SI917", type=str, default=None, required=False)
+    # p_flash_si_nwp_uart.add_argument(
+    #     "-f", "--firmware_path", help="Path to the SI917 NWP firmware .rps file", type=str, default=None, required=False
+    # )
+    # p_flash_si_nwp_uart.set_defaults(func=run_flash_si_nwp_uart)
+
+    # p_update_via_http = subparsers.add_parser(
+    #     "update-http", help="Update device via HTTP API using curl (upd_bundle.tar)"
+    # )
+    # p_update_via_http.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
+    # p_update_via_http.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
+    # p_update_via_http.set_defaults(func=run_update_via_http)
+
+    # p_update_via_storage = subparsers.add_parser(
+    #     "update-storage", help="Update device via storage.py (update bundle)"
+    # )
+    # p_update_via_storage.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
+    # p_update_via_storage.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
+    # p_update_via_storage.set_defaults(func=run_update_via_storage)
+
+    # p_wait_for_device = subparsers.add_parser(
+    #     "wait", help="Just wait for device to be reachable via ping, nothing else"
+    # )
+    # p_wait_for_device.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
+    # p_wait_for_device.set_defaults(func=run_wait_for_device)
+    
+
+    args = parser.parse_args()
+
+    if args.device in ["r", "R", "ref"]:
+        args.device = DEVICE_IP_REF
+
+    args.verbose = True
+
+    if args.command is not None:
+        return args.func(args)
+    else:
+        parser.print_help()
+
+
+def main():
+    setup_logging()
+
+    try:
+        ret = busybar_main()
+        print("RET: ", ret)
+        if ret and ret != 0:
+            print("Run: Exiting with error code", ret, file=sys.stderr)
+            sys.exit(1)
+    except KeyboardInterrupt:
+        print("Run: Exited", file=sys.stderr)
+        sys.exit(2)
+    # except subprocess.CalledProcessError as e:
+    #     sys.exit(e.returncode)
+    except Exception as e:
+        print(f"Run: Error: {e}", file=sys.stderr)
+        sys.exit(3)
+
+
+# if __name__ == "__main__":
+#     main()

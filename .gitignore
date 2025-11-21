@@ -1,0 +1,9 @@
+
+_old/
+
+# Python
+__pycache__/
+*.py[cod]
+
+busybar_tools.egg-info/
+dist/
