@@ -232,12 +232,14 @@ def busybar_update_parse_index(index_data, url_base):
     lines = index_data.splitlines()
     for line in lines:
         hash, filename = line.split(maxsplit=1)
+        hash = hash.strip()
+        filename = os.path.basename(filename.strip())
 
         file = {
-            "sha256sum": hash.strip(),
-            "file_name": filename.strip(),
-            "file_url": url_base + filename.strip(),
-            "file_type": busybar_type_by_filename(filename.strip())
+            "sha256sum": hash,
+            "file_name": filename,
+            "file_url": url_base + filename,
+            "file_type": busybar_type_by_filename(filename)
         }
         files.append(file)
 
