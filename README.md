@@ -9,15 +9,17 @@ Command-line (CLI) tools to manage your BUSY Bar device.
 Available as a Python package on [PyPI](https://pypi.org/project/busybar-tools/). Source code available on [GitHub](https://github.com/lomalkin/busybar-tools).
 
 
-## Installation
+## Installation and Upgrade
 
     brew install pipx           # MacOS (Homebrew)
     sudo apt install pipx       # Ubuntu/Debian
-    pipx ensurepath             # Optional
-
+    pipx ensurepath             # Optional step to ensure pipx binaries are in PATH
     # If you haven't install `pipx` before, you will NEED to open a new terminal before continuing.
 
     pipx install busybar-tools
+
+    pipx upgrade busybar-tools  # To upgrade to the latest available version if you have it installed already.
+
 
 ## Usage
 
