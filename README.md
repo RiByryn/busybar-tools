@@ -44,7 +44,7 @@ Options:
 - `busybar update` - Update to the latest firmware from the `dev` branch.
 - `busybar update 0.5.0` - Update to a specific TAG version (e.g., `0.5.0` release).
 - `busybar update factory` - Update to firmware from the desired (e.g., `factory`) branch.
-- `busybar update porta/remote-control` - Update to the desired branch another way.
+- `busybar -d 10.0.5.20 update porta/remote-control` - Update device with a custom address to the desired branch.
 - `busybar update https://update.flipperzero.one/builds/busybar-firmware/0.5.0/` - Update using a direct URL to the folder with build artifacts.
 
 - `busybar -d 10.0.5.20 update` - Specify a custom device IP address.
