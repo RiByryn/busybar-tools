@@ -6,6 +6,7 @@ import logging
 from busybar_tools import (
     run_update_via_http,
     run_clean,
+    run_cli_terminal
 )
 
 from busybar_tools.helpers import (
@@ -44,18 +45,15 @@ def busybar_main():
     p_run_update_http.add_argument("branch", help="Branch to update", type=str, default=UPDATE_DEFAULT_BRANCH, nargs='?')
     p_run_update_http.set_defaults(func=run_update_via_http)
 
+    p_run_cli = subparsers.add_parser(
+        "cli", help="CLI terminal session to device"
+    )
+    p_run_cli.set_defaults(func=run_cli_terminal)
+
     p_clean = subparsers.add_parser(
         "clean", help="Clean package's tmp directory"
     )
     p_clean.set_defaults(func=run_clean)
-
-    # CLI tool
-    # p_run_cli = subparsers.add_parser(
-    #     "cli", help="CLI terminal via Telnet"
-    # )
-    # p_run_cli.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
-    # p_run_cli.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
-    # p_run_cli.set_defaults(func=run_cli)
 
     # p_flash_u5_dfu = subparsers.add_parser(
     #     "flash-u5-dfu", help="Flash U5 firmware via DFU"

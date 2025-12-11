@@ -18,7 +18,11 @@ from urllib.parse import urlparse
 
 from busybar_tools.helpers import fetch_url, print_pretty, file_download, busybar_workdir_get, url_to_dir_name, busybar_api_update, busybar_update_get_index_file_name, busybar_update_url_normalize, busybar_update_parse_index, file_sha256
 
+from busybar_tools.bsb_term import run_session
+
 from busybar_tools.bsb_lite import BSB_Lite
+
+from busybar_tools.config import TCP_TIMEOUT_DEFAULT
 
 
 def bsb_debug_enable(args):
@@ -29,10 +33,20 @@ def bsb_debug_enable(args):
     res = bsb.sysctl_debug(1)
     print_pretty(res)
 
+def run_cli_terminal(args):
+    logging.info("Running CLI terminal...")
+    # print_pretty(args)
+
+    timeout = TCP_TIMEOUT_DEFAULT
+
+    print(f"Connecting to {args.device}:{args.port} with timeout {timeout}s...")
+    print("Press Ctrl+] to exit.")
+
+    run_session(args.device, args.port, tcp_timeout=timeout)
 
 def run_update_via_http(args):
     logging.info("Running update via HTTP...")
-    print_pretty(args)
+    # print_pretty(args)
 
     base_url = busybar_update_url_normalize(args.branch)
     logging.info(f"URL: {base_url}")
