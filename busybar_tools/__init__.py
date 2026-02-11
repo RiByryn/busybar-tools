@@ -239,8 +239,6 @@ def busybar_get_index_by_url(base_url, work_dir, args):
 def run_update_via_http(args):
     logging.info("Running update via HTTP...")
 
-    wait_for_device(args.device, verbose=args.verbose)
-
     base_url = busybar_update_url_normalize(args.branch)
     logging.info(f"URL: {base_url}")
 
@@ -265,6 +263,7 @@ def run_update_via_http(args):
             break
 
     if file_path:
+        wait_for_device(args.device, verbose=args.verbose)
         bsb_sysctl_debug_enable(args)
         return busybar_api_update(args.device, file_path)
     else:
@@ -273,8 +272,6 @@ def run_update_via_http(args):
 
 def run_update_via_storage(args):
     logging.info("Running update via HTTP...")
-
-    wait_for_device(args.device, verbose=args.verbose)
 
     base_url = busybar_update_url_normalize(args.branch)
     logging.info(f"URL: {base_url}")
@@ -305,8 +302,6 @@ def run_update_via_storage(args):
         shutil.unpack_archive(file_path, unpack_dir)
         logging.info(f"Unpacked: {os.listdir(unpack_dir)}")
 
-
-        print_pretty(args)
         dir_dst = DIR_BSB_TMP + "/update"
         unlock_bkp = False
         if args.save_as_recovery_only == True:
@@ -316,6 +311,9 @@ def run_update_via_storage(args):
                 time.sleep(1)
             dir_dst = DIR_BSB_RECOVERY
             unlock_bkp = True
+        
+        wait_for_device(args.device, verbose=args.verbose)
+
         busybar_storage_upload_dir_to_device((args.device, args.port), unpack_dir, dir_dst, unlock_bkp=unlock_bkp)
 
         assert busybar_storage_verify_dir_on_device((args.device, args.port), unpack_dir, dir_dst), "Verification failed after upload!"
