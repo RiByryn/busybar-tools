@@ -75,7 +75,10 @@ Options:
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
 
-## 0.3.0 - latest
+## 0.3.1
+- Fix a bug with device path creation in `busybar update-storage` command.
+
+## 0.3.0
 - Fixed CLI `busybar cli`: now it properly works with auto-complete and history navigation with arrow keys.
 - Update via storage.py `busybar update-storage`. There is an DANGEROUS option, allows to rewrite the device recovery bundle by using --save-as-recovery-only key.
 - Invocation of update from `/bkp/recovery` via `busybar update-recovery` command.
