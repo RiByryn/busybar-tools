@@ -20,6 +20,8 @@ Available as a Python package on [PyPI](https://pypi.org/project/busybar-tools/)
 
     pipx upgrade busybar-tools  # To upgrade to the latest available version if you have it installed already.
 
+Install in editable mode (for development): `pip install -e .` from the project root directory.
+
 
 ## Usage
 
@@ -41,6 +43,8 @@ Options:
 
 ### Update firmware
 
+> Subcommands `update` and `update-storage` without additional options has the same effect.
+
 - `busybar update` - Update to the latest firmware from the `dev` branch.
 - `busybar update 0.5.0` - Update to a specific TAG version (e.g., `0.5.0` release).
 - `busybar update factory` - Update to firmware from the desired (e.g., `factory`) branch.
@@ -49,10 +53,18 @@ Options:
 
 - `busybar -d 10.0.5.20 update` - Specify a custom device IP address.
 
+- `busybar update-storage` - Update via storage.py. This is a more low-level way to update, which allows to update the device even if it's in a broken state.
+
 ### CLI terminal
 
 - `busybar cli` - Start a terminal session to the BUSY Bar device. Press `Ctrl+]` to exit the session.
 - `busybar -d 10.0.5.20 -p 23 cli` - Start a terminal session to the BUSY Bar device with a custom IP address and port.
+
+### Other operations
+
+- `busybar wait` - Wait for the device to be available. This can be useful for scripting.
+- `busybar update-storage --save-as-recovery-only factory` - Write factory bundle to the recovery partition. This is a **DANGEROUS** operation, as it can potentially brick the device. Usage is not recommended for regular users.
+- `busybar update-recovery` - Invoke update from the recovery bundle already located in `/bkp/recovery` on the device.
 
 ---
 
@@ -62,6 +74,12 @@ Options:
 - Easy recovery via DFU from any possible broken state
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
+
+## 0.3.0 - latest
+- Fixed CLI `busybar cli`: now it properly works with auto-complete and history navigation with arrow keys.
+- Update via storage.py `busybar update-storage`. There is an DANGEROUS option, allows to rewrite the device recovery bundle by using --save-as-recovery-only key.
+- Invocation of update from `/bkp/recovery` via `busybar update-recovery` command.
+- Wait for device available before any operations.
 
 ## 0.2.0 - latest
 - CLI terminal session to device available via `busybar cli` command
