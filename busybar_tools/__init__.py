@@ -8,6 +8,7 @@ import json
 
 import json
 import os
+import posixpath
 import re
 from urllib import request
 import logging
@@ -28,6 +29,35 @@ from busybar_tools.flipper.cli import Cli
 from busybar_tools.flipper.storage_socket import FlipperStorage
 
 def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=False):
+    def flipper_mkdir_p(storage, path: str):
+        """Create directory and parents on Flipper (mkdir -p semantics).
+
+        Uses posix-style path operations so it works correctly for the device.
+        """
+        # Normalize and ensure absolute-like path
+        path = posixpath.normpath(path)
+        if not path.startswith("/"):
+            path = "/" + path
+
+        # Walk components and create missing directories
+        parts = path.split("/")
+        cur = ""
+        for part in parts:
+            if part == "":
+                cur = "/"
+                continue
+            if cur == "/":
+                cur = "/" + part
+            else:
+                cur = cur + "/" + part
+
+            try:
+                if not storage.exist_dir(cur):
+                    logging.info(f"Creating {cur} on device...")
+                    storage.mkdir(cur)
+            except Exception as e:
+                # Re-raise with context so caller can handle/abort
+                raise
     try:
         if unlock_bkp:
             with Cli(device) as cli:
@@ -39,10 +69,8 @@ def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=Fa
         with FlipperStorage(device) as storage:
             logging.info(f"Uploading {dir_src} to {dir_dst} @ {device[0]}:{device[1]}...")
 
-            # Ensure target dir exists
-            if not storage.exist_dir(dir_dst):
-                logging.info(f"Creating {dir_dst} on device...")
-                storage.mkdir(dir_dst)
+            # Ensure target dir and parents exist (mkdir -p semantics)
+            flipper_mkdir_p(storage, dir_dst)
 
             for root, dirs, files in os.walk(dir_src):
                 # Create subdirectories
@@ -51,15 +79,18 @@ def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=Fa
                     rel_path = os.path.relpath(local_dir, dir_src)
                     device_dir = f"{dir_dst}/{rel_path.replace(os.sep, "/")}"
 
-                    if not storage.exist_dir(device_dir):
-                        logging.info(f"Creating {device_dir} on device...")
-                        storage.mkdir(device_dir)
+                    flipper_mkdir_p(storage, device_dir)
 
                 # Upload files
                 for file_name in files:
                     local_file = os.path.join(root, file_name)
                     rel_path = os.path.relpath(local_file, dir_src)
                     device_file = f"{dir_dst}/{rel_path.replace(os.sep, "/")}"
+
+                    # Make sure parent dir exists before sending file
+                    parent = posixpath.dirname(device_file)
+                    if parent and parent != "":
+                        flipper_mkdir_p(storage, parent)
 
                     size = os.path.getsize(local_file)
                     logging.info(f"Uploading {device_file} ({size} bytes) to device...")
