@@ -9,6 +9,8 @@ from urllib import request
 import shutil, platform
 import re, hashlib
 
+import subprocess, time
+
 from busybar_tools.config import PROJECT_NAME, FETCH_TIMEOUT_DEFAULT, UPDATE_SERVER_BASE
     
 def setup_logging():
@@ -52,6 +54,34 @@ def print_pretty(data, return_instead_of_print=False):
     else:
         return _out_handler(_convert_to_json(data))
 
+def wait_for_device(device_ip, verbose=False):
+    ts = time.time()
+
+    ping_cmd = ['ping', '-c', '1', '-W', '1']  # Unix: -c count, -W timeout (sec)
+    if platform.system() == 'Windows':
+        ping_cmd = ['ping', '-n', '1', '-w', '1000']  # Windows: -n count, -w timeout (ms)
+
+    ping_cmd.append(device_ip)
+
+    while True:
+        try:
+            result = subprocess.run(
+                ping_cmd,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                break
+            elif verbose:
+                print(f"Ping {device_ip} failed, ret: {result.returncode}")
+        except Exception as e:
+            print(f"Ping error: {device_ip}: {e}")
+            time.sleep(1)
+        time.sleep(0.1)
+
+    if verbose:
+        print(f"Device found in {time.time() - ts:.3f} seconds.")
+
 def file_download(file_url, file_name, dir):
     logging.info(f"Downloading {file_url} to {dir} ...")
     os.makedirs(dir, exist_ok=True)
@@ -62,7 +92,6 @@ def file_download(file_url, file_name, dir):
     if os.path.isfile(file_path):
         return file_path
     return False
-
 
 def busybar_workdir_get(subdir = None, suffix_len=4) -> str:
     script_path = os.path.dirname(os.path.abspath(__file__))

@@ -7,3 +7,10 @@ __pycache__/
 
 busybar_tools.egg-info/
 dist/
+
+# IDEs
+.idea/
+.vscode/
+
+# macOS
+.DS_Store

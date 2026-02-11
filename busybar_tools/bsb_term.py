@@ -33,20 +33,27 @@ def run_session(host: str, port: int, tcp_timeout: int) -> None:
 
             # Data from stdin
             if sys.stdin in rlist:
-                data = sys.stdin.buffer.read(1)
+                # Read all available data to avoid breaking escape sequences
+                data = sys.stdin.buffer.read1(4096)
                 if not data:
                     # EOF on stdin
                     break
 
-                if data == ESCAPE_BYTE:
+                # Check for local escape character
+                if ESCAPE_BYTE in data:
                     # Local escape: close connection and exit
                     break
 
-                # Translate '\n' to '\r\n' like crnl
-                if data == b'\n':
-                    sock.sendall(b'\r\n')
-                else:
-                    sock.sendall(data)
+                # Process the data: translate '\n' to '\r\n' like crnl
+                # but preserve escape sequences (Tab, arrows, etc.)
+                result = bytearray()
+                for byte in data:
+                    if byte == ord('\n'):
+                        result.extend(b'\r\n')
+                    else:
+                        result.append(byte)
+                
+                sock.sendall(bytes(result))
 
             # Data from socket
             if sock in rlist:

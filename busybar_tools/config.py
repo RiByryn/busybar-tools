@@ -16,3 +16,8 @@ DEVICE_PORT = 23
 # Firmware U5 target:
 U5_TARGET_HW = 21   # Default, can be overridden by -t / --target option.
 U5_TARGET_HW_OPTIONS = [20, 21, 22]
+
+# Device Paths:
+DIR_BSB_TMP = "/ext/tmp"
+DIR_BSB_RECOVERY = "/bkp/recovery"
+UPDATE_MANIFEST_FILE = "update.json"
