@@ -331,6 +331,7 @@ def run_update_from_recovery(args):
 
     wait_for_device(args.device, verbose=args.verbose)
 
+    assert bsb_sysctl_debug_enable(args), "Failed to enable debug mode!"
     assert bsb_invoke_update(args, DIR_BSB_RECOVERY), "Failed to invoke update from recovery!"
 
 def run_wait_for_device(args):

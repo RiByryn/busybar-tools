@@ -75,6 +75,9 @@ Options:
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
 
+## 0.3.2
+- Force enable debug mode before invoking update from recovery. Useful if the device does not allow to start update from recovery due to low battery level. This can potentially lead to bricking the device, so use it with caution.
+
 ## 0.3.1
 - Fix a bug with device path creation in `busybar update-storage` command.
 
