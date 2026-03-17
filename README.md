@@ -77,6 +77,7 @@ Options:
 
 ## 0.4.0
 - Python 3.8 compatibility. Python 3.8 is the minimum required version now.
+- wait_for_device(): now in single line, calc seconds.
 
 ## 0.3.2
 - Force enable debug mode before invoking update from recovery. Useful if the device does not allow to start update from recovery due to low battery level. This can potentially lead to bricking the device, so use it with caution.

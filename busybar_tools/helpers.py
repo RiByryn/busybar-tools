@@ -54,33 +54,59 @@ def print_pretty(data, return_instead_of_print=False):
     else:
         return _out_handler(_convert_to_json(data))
 
-def wait_for_device(device_ip, verbose=False):
+def network_ping_bool(host, timeout=1, verbose=False):
+    try:
+        output = subprocess.check_output(
+            ["ping", "-c", "1", "-t", str(timeout), host],
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+        )
+        if verbose:
+            print(output)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def wait_for_device(
+    ip, timeout = None, verbose=False, delay=1, success_ping_as=True, verbose_in_place=True
+):
+    data = {
+        "ip": ip,
+        "try_counter": 0,
+        "success": False,
+    }
+
+    def _print_in_place(msg: str):
+        print(f"\r\033[K{msg}", end="", flush=True)  # \033[K to clear the line
+
     ts = time.time()
-
-    ping_cmd = ['ping', '-c', '1', '-W', '1']  # Unix: -c count, -W timeout (sec)
-    if platform.system() == 'Windows':
-        ping_cmd = ['ping', '-n', '1', '-w', '1000']  # Windows: -n count, -w timeout (ms)
-
-    ping_cmd.append(device_ip)
-
+    if verbose and verbose_in_place:
+        _print_in_place(f"Ping {ip}... ")
     while True:
-        try:
-            result = subprocess.run(
-                ping_cmd,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                break
-            elif verbose:
-                print(f"Ping {device_ip} failed, ret: {result.returncode}")
-        except Exception as e:
-            print(f"Ping error: {device_ip}: {e}")
-            time.sleep(1)
-        time.sleep(0.1)
-
-    if verbose:
-        print(f"Device found in {time.time() - ts:.3f} seconds.")
+        res = network_ping_bool(ip, delay)
+        time_elapsed_int = int(time.time() - ts)
+        data["try_counter"] += 1
+        msg = f"{data['try_counter']}: PING {ip} ({time_elapsed_int}s)"
+        if res == success_ping_as:
+            data["success"] = True
+            if verbose:
+                if verbose_in_place:
+                    _print_in_place(msg + ": OK")
+                else:
+                    print(msg + ": OK")
+            break
+        else:
+            if verbose:
+                if verbose_in_place:
+                    _print_in_place(msg + ": Failed")
+                else:
+                    print(msg + ": Failed")
+        if timeout is not None and ts + timeout <= time.time():
+            break
+        time.sleep(delay)
+    if verbose and verbose_in_place:
+        print("")  # move to next line after loop
+    return data
 
 def file_download(file_url, file_name, dir):
     logging.info(f"Downloading {file_url} to {dir} ...")

@@ -91,42 +91,6 @@ def busybar_main():
     # p_flash_u5_dfu.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
     # p_flash_u5_dfu.set_defaults(func=run_flash_u5_dfu)
 
-    # p_flash_si_uart = subparsers.add_parser(
-    #     "flash-si-uart", help="Flash SI917 firmware via UART"
-    # )
-    # p_flash_si_uart.add_argument("-s", "--serial_port", help="Serial port for SI917", type=str, default=None, required=False)
-    # p_flash_si_uart.add_argument("-f", "--firmware_path", help="Path to the SI917 firmware .rps file", type=str, default=None, required=False)
-    # p_flash_si_uart.set_defaults(func=run_flash_si_uart)
-
-    # p_flash_si_nwp_uart = subparsers.add_parser(
-    #     "flash-si-nwp-uart", help="Flash SI917 NWP firmware via UART"
-    # )
-    # p_flash_si_nwp_uart.add_argument("-s", "--serial_port", help="Serial port for SI917", type=str, default=None, required=False)
-    # p_flash_si_nwp_uart.add_argument(
-    #     "-f", "--firmware_path", help="Path to the SI917 NWP firmware .rps file", type=str, default=None, required=False
-    # )
-    # p_flash_si_nwp_uart.set_defaults(func=run_flash_si_nwp_uart)
-
-    # p_update_via_http = subparsers.add_parser(
-    #     "update-http", help="Update device via HTTP API using curl (upd_bundle.tar)"
-    # )
-    # p_update_via_http.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
-    # p_update_via_http.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
-    # p_update_via_http.set_defaults(func=run_update_via_http)
-
-    # p_update_via_storage = subparsers.add_parser(
-    #     "update-storage", help="Update device via storage.py (update bundle)"
-    # )
-    # p_update_via_storage.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
-    # p_update_via_storage.add_argument("-p", "--device_port", help="Device Port", type=int, default=DEVICE_PORT)
-    # p_update_via_storage.set_defaults(func=run_update_via_storage)
-
-    # p_wait_for_device = subparsers.add_parser(
-    #     "wait", help="Just wait for device to be reachable via ping, nothing else"
-    # )
-    # p_wait_for_device.add_argument("-d", "--device_ip", help="Device IP", type=str, default=DEVICE_IP)
-    # p_wait_for_device.set_defaults(func=run_wait_for_device)
-    
 
     args = parser.parse_args()
 
