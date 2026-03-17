@@ -77,7 +77,7 @@ def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=Fa
                 for dir_name in dirs:
                     local_dir = os.path.join(root, dir_name)
                     rel_path = os.path.relpath(local_dir, dir_src)
-                    device_dir = f"{dir_dst}/{rel_path.replace(os.sep, "/")}"
+                    device_dir = f"{dir_dst}/{rel_path.replace(os.sep, '/')}"
 
                     flipper_mkdir_p(storage, device_dir)
 
@@ -85,7 +85,7 @@ def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=Fa
                 for file_name in files:
                     local_file = os.path.join(root, file_name)
                     rel_path = os.path.relpath(local_file, dir_src)
-                    device_file = f"{dir_dst}/{rel_path.replace(os.sep, "/")}"
+                    device_file = f"{dir_dst}/{rel_path.replace(os.sep, '/')}"
 
                     # Make sure parent dir exists before sending file
                     parent = posixpath.dirname(device_file)

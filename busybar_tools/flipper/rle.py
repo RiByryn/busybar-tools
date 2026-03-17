@@ -4,7 +4,8 @@
 # Compatible with `lib/toolbox/rle_encode`
 # For the format specification, see `lib/toolbox/rle_encode.c`
 
-from random import randbytes, randint
+import os
+from random import randint
 
 MAX_BLOCKS_PER_BYTE = 127
 RLE_BLOCK_THRESHOLD = 3
@@ -78,7 +79,7 @@ def decompress(source: bytes, blk_size: int) -> bytes:
 def test_rle_single(blk_size):
     default_len = 512
     original_len = default_len - (default_len % blk_size)
-    original = bytearray(randbytes(original_len))
+    original = bytearray(os.urandom(original_len))
 
     # insert repeating data so RLE has a chance to kick in
     for i in range(3):
