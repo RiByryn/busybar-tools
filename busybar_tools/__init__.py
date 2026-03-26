@@ -265,7 +265,7 @@ def busybar_get_file_by_filetype(source_url, file_type, work_dir, index_parsed):
     
     return file_path
 
-def run_install(args, verbose=True):
+def run_install(args, verbose=False):
     if verbose:
         for arg, value in vars(args).items():
             print(f"\t{arg}: {value}")
@@ -280,6 +280,8 @@ def run_install(args, verbose=True):
 
         # Craft file_type, "(update|bkp)[_signed]_(tar|tgz)"
         file_type = f"{args.update_bundle_type}"
+        if args.save_as_recovery == True:
+            file_type = "bkp"
         if args.signed:
             file_type += "_signed" 
 

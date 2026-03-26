@@ -1,6 +1,10 @@
 
 _old/
 
+# Bundles
+*.tar
+*.tgz
+
 # Python
 __pycache__/
 *.py[cod]
