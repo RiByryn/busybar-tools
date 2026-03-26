@@ -5,17 +5,17 @@ import logging
 from importlib.metadata import version
 
 from busybar_tools import (
-    run_update_via_http,
     run_update_via_storage,
     run_update_from_recovery,
     run_clean,
     run_cli_terminal,
-    run_wait_for_device
-    
+    run_wait_for_device,
+    run_install,
 )
 
 from busybar_tools.helpers import (
-    setup_logging
+    setup_logging,
+    print_pretty,
 )
 
 from busybar_tools.config import (
@@ -34,6 +34,7 @@ try:
 except Exception:
     __version__ = "unknown"
 
+
 def busybar_main():
     logging.debug(f"cwd: {os.getcwd()}")
 
@@ -51,23 +52,43 @@ def busybar_main():
         dest="command", help="Commands to run", required=False
     )
 
-    p_run_update_http = subparsers.add_parser(
-        "update", help="Update firmware via HTTP API"
+    p_install = subparsers.add_parser(
+        "install", help="Install firmware on device"
     )
-    p_run_update_http.add_argument("branch", help="Branch to update", type=str, default=UPDATE_DEFAULT_BRANCH, nargs='?')
-    p_run_update_http.set_defaults(func=run_update_via_http)
+    p_install.add_argument("source", help="Branch, tag, URL or local file path", type=str, default=UPDATE_DEFAULT_BRANCH, nargs='?')
 
-    p_run_update_storage = subparsers.add_parser(
-        "update-storage", help="Update firmware via storage.py"
-    )
-    p_run_update_storage.add_argument("branch", help="Branch to update", type=str, default=UPDATE_DEFAULT_BRANCH, nargs='?')
-    p_run_update_storage.add_argument("--save-as-recovery-only", help="Save update bundle as recovery bundle on device /bkp (Danger!)", action="store_true", default=False)
-    p_run_update_storage.set_defaults(func=run_update_via_storage)
+    # Update bundle security: signed vs unsigned
+    sign_group = p_install.add_mutually_exclusive_group()
+    sign_group.add_argument("--signed", dest="signed", action="store_true", help="Use signed firmware (default)")
+    sign_group.add_argument("--unsigned", dest="signed", action="store_false", help="Use unsigned firmware")
 
-    p_run_update_from_recovery = subparsers.add_parser(
-        "update-recovery", help=f"Update firmware via CLI from {DIR_BSB_RECOVERY}"
-    )
-    p_run_update_from_recovery.set_defaults(func=run_update_from_recovery)
+    # Update bundle type: update vs bkp
+    update_bundle_type_group = p_install.add_mutually_exclusive_group()
+    update_bundle_type_group.add_argument("--update", dest="update_bundle_type", action="store_const", const="update", help="Regular update bundle (default)")
+    update_bundle_type_group.add_argument("--bkp", dest="update_bundle_type", action="store_const", const="bkp", help="Use bkp bundle instead of update (default: update)")
+    p_install.set_defaults(update_bundle_type="update")
+
+    # Transport: storage vs http
+    transport_group = p_install.add_mutually_exclusive_group()
+    transport_group.add_argument("--via-storage", dest="via_storage", action="store_true", help="Use storage.py transport (default)")
+    transport_group.add_argument("--via-http", dest="via_storage", action="store_false", help="Use HTTP transport")
+
+    p_install.add_argument("--save-as-recovery", dest="save_as_recovery", action="store_true", help="Save update bundle as recovery bundle on device (danger!)")
+
+    p_install.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Do not invoke update after saving the bundle on device (use with --save-as-recovery)")
+
+    p_install.set_defaults(func=run_install, signed=True, via_storage=True)
+
+    # p_write_recovery = subparsers.add_parser(
+    #     "write-recovery", help="Write firmware bundle to /bkp/recovery on device"
+    # )
+    # p_write_recovery.add_argument("source", help="Branch, tag, URL or local file path", type=str, default=UPDATE_DEFAULT_BRANCH, nargs='?')
+    # sign_group_wr = p_write_recovery.add_mutually_exclusive_group()
+    # sign_group_wr.add_argument("--signed", dest="signed", action="store_true", help="Use signed firmware (default)")
+    # sign_group_wr.add_argument("--unsigned", dest="signed", action="store_false", help="Use unsigned firmware")
+    # p_write_recovery.add_argument("--via-http", dest="via_http", action="store_true", default=False, help="Use HTTP transport instead of storage (default: storage)")
+    # p_write_recovery.add_argument("--update-bundle", dest="update_bundle", action="store_true", default=False, help="Use update artifact type instead of bkp")
+    # p_write_recovery.set_defaults(func=run_dummy, signed=True)
 
     p_run_cli = subparsers.add_parser(
         "cli", help="CLI terminal session to device"
@@ -98,9 +119,6 @@ def busybar_main():
         args.device = DEVICE_IP_REF
 
     args.verbose = True
-
-    if '--save-as-recovery-only' not in sys.argv and any(arg.startswith('--s') for arg in sys.argv):
-        parser.error("Invalid argument abbreviation. Use '--save-as-recovery-only' explicitly.")
 
     if args.command is not None:
         return args.func(args)

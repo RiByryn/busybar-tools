@@ -108,13 +108,30 @@ def wait_for_device(
         print("")  # move to next line after loop
     return data
 
-def file_download(file_url, file_name, dir):
+def file_download(file_url, file_name, dir, progress=False):
     logging.info(f"Downloading {file_url} to {dir} ...")
     os.makedirs(dir, exist_ok=True)
 
     file_path = os.path.join(dir, file_name)
 
-    request.urlretrieve(file_url, file_path)
+    if progress:
+        def _reporthook(block_num, block_size, total_size):
+            downloaded = min(block_num * block_size, total_size) if total_size > 0 else block_num * block_size
+            if total_size > 0:
+                percent = downloaded * 100 // total_size
+                bar_len = 30
+                filled = bar_len * percent // 100
+                bar = ('=' * filled + '>' + ' ' * (bar_len - filled - 1)) if filled < bar_len else '=' * bar_len
+                dl_mb = downloaded / 1_048_576
+                total_mb = total_size / 1_048_576
+                print(f"\r{file_name}: {dl_mb:.1f}/{total_mb:.1f} MB [{bar}] {percent}%", end="", flush=True)
+            else:
+                print(f"\r{file_name}: {block_num * block_size / 1_048_576:.1f} MB", end="", flush=True)
+        request.urlretrieve(file_url, file_path, reporthook=_reporthook)
+        print(flush=True)
+    else:
+        request.urlretrieve(file_url, file_path)
+
     if os.path.isfile(file_path):
         return file_path
     return False
@@ -134,6 +151,8 @@ def busybar_workdir_get(subdir = None, suffix_len=4) -> str:
         tmp_dir = os.path.join(tmp_dir, subdir)
 
     os.makedirs(tmp_dir, exist_ok=True)
+
+    logging.debug(f"Workdir: {tmp_dir}")
 
     return tmp_dir
 

@@ -17,7 +17,9 @@ import http.client
 import os
 from urllib.parse import urlparse
 
-from busybar_tools.helpers import fetch_url, print_pretty, file_download, busybar_workdir_get, url_to_dir_name, busybar_api_update, busybar_update_get_index_file_name, busybar_update_url_normalize, busybar_update_parse_index, file_sha256, wait_for_device
+from busybar_tools.helpers import (
+    fetch_url, print_pretty, file_download, busybar_workdir_get, url_to_dir_name, busybar_api_update, busybar_update_get_index_file_name, busybar_update_url_normalize, busybar_update_parse_index, file_sha256, wait_for_device
+)
 
 from busybar_tools.bsb_term import run_session
 
@@ -27,6 +29,8 @@ from busybar_tools.config import TCP_TIMEOUT_DEFAULT, DIR_BSB_TMP, DIR_BSB_RECOV
 
 from busybar_tools.flipper.cli import Cli
 from busybar_tools.flipper.storage_socket import FlipperStorage
+
+UNPACKED_DIR_NAME = "unpacked"
 
 def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=False):
     def flipper_mkdir_p(storage, path: str):
@@ -164,11 +168,11 @@ def busybar_storage_verify_dir_on_device(device, dir_src, dir_dst):
         logging.error(f"Verification failed: {e}")
         return False
 
-def bsb_sysctl_debug_enable(args):
+def bsb_sysctl_debug_enable(device, port):
     logging.info("Try to enable debug mode...")
 
     try:
-        bsb = BSB_Lite((args.device, args.port))
+        bsb = BSB_Lite((device, port))
         bsb.start()
         res = bsb.sysctl_debug(1)
         print_pretty(res)
@@ -177,11 +181,11 @@ def bsb_sysctl_debug_enable(args):
         logging.error(f"Failed to enable debug mode: {e}")
         return False
 
-def bsb_invoke_update(args, file_path):
+def bsb_invoke_update(device, port, file_path):
     logging.info("Try to invoke update via API...")
 
     try:
-        bsb = BSB_Lite((args.device, args.port))
+        bsb = BSB_Lite((device, port))
         bsb.start()
         res = bsb.cmd_oneshot(f"update install {file_path}/{UPDATE_MANIFEST_FILE}", timeout = 3)
         print_pretty(res)
@@ -202,14 +206,16 @@ def run_cli_terminal(args):
 
     run_session(args.device, args.port, tcp_timeout=timeout)
 
-def busybar_get_index_by_url(base_url, work_dir, args):
-    index_name = busybar_update_get_index_file_name(args.target)
+def busybar_get_index_by_url(base_url, target, work_dir):
+    index_name = busybar_update_get_index_file_name(target)
     index_url = f"{base_url}{index_name}"
 
     try:
         index_data = fetch_url(index_url, timeout=10)
         if not index_data:
             raise Exception(f"Failed to fetch index {index_url}")
+        else:
+            logging.info(f"Fetched index content from {index_url}, length: {len(index_data)} bytes")
     except Exception as e:
         index_data = None
         logging.warning(f"{e}")
@@ -236,103 +242,140 @@ def busybar_get_index_by_url(base_url, work_dir, args):
     # print_pretty(index_parsed)
     return index_parsed
 
+
+def busybar_get_file_by_filetype(source_url, file_type, work_dir, index_parsed):
+    logging.info(f"Trying for file_type {file_type}...")
+
+    file_path = None
+    for file in index_parsed:
+        if file["file_type"] == file_type:
+            file_path = os.path.join(work_dir, file['file_name'])
+            if file_sha256(file_path) != file["sha256sum"]:
+                logging.warning(f"File missing or Hash check failed: {file['file_name']}")
+
+                file_path = file_download(file["file_url"], file['file_name'], work_dir, progress=True)
+            
+            if file_sha256(file_path) == file["sha256sum"]:
+                logging.info(f"Hash check passed: {file['file_name']}: {file['sha256sum']}")
+            else:
+                logging.error(f"Hash check failed ONCE AGAIN: {file['file_name']}: {file['sha256sum']}")
+            break
+    if file_path is None:
+        logging.error(f"Failed to find file of type {file_type} in index!")
+    
+    return file_path
+
+def run_install(args, verbose=True):
+    if verbose:
+        for arg, value in vars(args).items():
+            print(f"\t{arg}: {value}")
+    
+    args.source_file = None
+    if os.path.isfile(args.source):
+        args.source_file = os.path.abspath(args.source)
+        logging.info(f"Consdering Source as FILE: {args.source}, absolute path: {args.source_file}")
+    else:
+        args.source_url = busybar_update_url_normalize(args.source)
+        logging.info(f"Consdering Source as URL: {args.source}, normalized URL: {args.source_url}")
+
+        # Craft file_type, "(update|bkp)[_signed]_(tar|tgz)"
+        file_type = f"{args.update_bundle_type}"
+        if args.signed:
+            file_type += "_signed" 
+
+        work_dir = busybar_workdir_get(url_to_dir_name(args.source_url))
+
+        index_parsed = busybar_get_index_by_url(args.source_url, args.target, work_dir)
+
+        try:
+            args.source_file = busybar_get_file_by_filetype(args.source_url, f"{file_type}_tgz", work_dir, index_parsed)
+        except Exception as e:
+            logging.error(f"Failed to get file by type {file_type}_tgz: {e}")
+        # Fallback to _tar if _tgz not found
+        if args.source_file is None:
+            try:
+                args.source_file = busybar_get_file_by_filetype(args.source_url, f"{file_type}_tar", work_dir, index_parsed)
+            except Exception as e:
+                logging.error(f"Failed to get file by type {file_type}_tar: {e}")
+                logging.error("No suitable update file found in index!")
+                return 1
+            
+    if args.source_file:
+        print(f"Source file: {args.source_file}")
+
+        work_dir = busybar_workdir_get("local_file")
+        unpacked_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
+        # Clean up work dir before update to avoid confusion with old files
+        try:
+            shutil.rmtree(unpacked_dir, ignore_errors=True)
+        except Exception as e:
+            logging.error(f"Error cleaning up {unpacked_dir}: {e}")
+            return 1
+        # sys.exit(0)
+
+        if args.via_storage == True:
+            save_as_recovery = False
+            invoke_update = True
+            if args.save_as_recovery == True:
+                logging.warning("Will save the update bundle as recovery bundle on device /bkp! This can be dangerous if the bundle is not correct!")
+                save_as_recovery = True
+                invoke_update = False
+            if args.invoke_update == False:
+                invoke_update = False
+            
+            if invoke_update == False:
+                logging.warning("Will NOT invoke update after uploading the bundle on device!")
+            return run_update_via_storage(args, work_dir, save_as_recovery=save_as_recovery, invoke_update=invoke_update)
+        else:
+            return run_update_via_http(args)
+    else:
+        logging.error("No source file available for update!")
+        return 1
+
 def run_update_via_http(args):
-    logging.info("Running update via HTTP...")
+    logging.info("Using HTTP transport for update...")
+    wait_for_device(args.device, verbose=args.verbose)
+    bsb_sysctl_debug_enable(args.device, args.port)
+    return busybar_api_update(args.device, args.source_file)
 
-    base_url = busybar_update_url_normalize(args.branch)
-    logging.info(f"URL: {base_url}")
 
-    work_dir = busybar_workdir_get(url_to_dir_name(base_url))
-    logging.info(f"Workdir: {work_dir}")
+def run_update_via_storage(args, work_dir, save_as_recovery=False, invoke_update=True):
+    logging.info("Running update via storage...")
 
-    index_parsed = busybar_get_index_by_url(base_url, work_dir, args)
+    unpack_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
 
-    file_path = None
-    for file in index_parsed:
-        if file["file_type"] == "update_tar":
-            file_path = os.path.join(work_dir, file['file_name'])
-            if file_sha256(file_path) != file["sha256sum"]:
-                logging.warning(f"File missing or Hash check failed: {file['file_name']}")
+    logging.info(f"Unpacking update bundle to {unpack_dir}...")
+    shutil.unpack_archive(args.source_file, unpack_dir)
+    logging.info(f"Unpacked: {os.listdir(unpack_dir)}")
 
-                file_path = file_download(file["file_url"], file['file_name'], work_dir)
-            
-            if file_sha256(file_path) == file["sha256sum"]:
-                logging.info(f"Hash check passed: {file['file_name']}: {file['sha256sum']}")
-            else:
-                logging.error(f"Hash check failed ONCE AGAIN: {file['file_name']}: {file['sha256sum']}")
-            break
+    dir_dst = DIR_BSB_TMP + "/update"
+    unlock_bkp = False
+    if save_as_recovery == True:
+        logging.warning("Danger! Saving update bundle as recovery bundle on device /bkp!")
+        for i in range(3):
+            logging.warning(f"You have {3 - i} seconds to Cancel (Ctrl+C)...")
+            time.sleep(1)
+        dir_dst = DIR_BSB_RECOVERY
+        unlock_bkp = True
+    
+    wait_for_device(args.device, verbose=args.verbose)
 
-    if file_path:
-        wait_for_device(args.device, verbose=args.verbose)
-        bsb_sysctl_debug_enable(args)
-        return busybar_api_update(args.device, file_path)
-    else:
-        logging.error("No update file found.")
-        return 1
+    busybar_storage_upload_dir_to_device((args.device, args.port), unpack_dir, dir_dst, unlock_bkp=unlock_bkp)
 
-def run_update_via_storage(args):
-    logging.info("Running update via HTTP...")
+    assert busybar_storage_verify_dir_on_device((args.device, args.port), unpack_dir, dir_dst), "Verification failed after upload!"
 
-    base_url = busybar_update_url_normalize(args.branch)
-    logging.info(f"URL: {base_url}")
-
-    work_dir = busybar_workdir_get(url_to_dir_name(base_url))
-    logging.info(f"Workdir: {work_dir}")
-
-    index_parsed = busybar_get_index_by_url(base_url, work_dir, args)
-
-    file_path = None
-    for file in index_parsed:
-        if file["file_type"] == "update_tar":
-            file_path = os.path.join(work_dir, file['file_name'])
-            if file_sha256(file_path) != file["sha256sum"]:
-                logging.warning(f"File missing or Hash check failed: {file['file_name']}")
-
-                file_path = file_download(file["file_url"], file['file_name'], work_dir)
-            
-            if file_sha256(file_path) == file["sha256sum"]:
-                logging.info(f"Hash check passed: {file['file_name']}: {file['sha256sum']}")
-            else:
-                logging.error(f"Hash check failed ONCE AGAIN: {file['file_name']}: {file['sha256sum']}")
-            break
-
-    if file_path:
-        unpack_dir = os.path.join(work_dir, "unpacked")
-        logging.info(f"Unpacking update bundle to {unpack_dir}...")
-        shutil.unpack_archive(file_path, unpack_dir)
-        logging.info(f"Unpacked: {os.listdir(unpack_dir)}")
-
-        dir_dst = DIR_BSB_TMP + "/update"
-        unlock_bkp = False
-        if args.save_as_recovery_only == True:
-            logging.warning("Danger! Saving update bundle as recovery bundle on device /bkp!")
-            for i in range(3):
-                logging.warning(f"You have {3 - i} seconds to cancel (Ctrl+C)...")
-                time.sleep(1)
-            dir_dst = DIR_BSB_RECOVERY
-            unlock_bkp = True
+    if invoke_update == True:
+        assert bsb_sysctl_debug_enable(args.device, args.port), "Failed to enable debug mode!"
+        assert bsb_invoke_update(args.device, args.port, dir_dst), "Failed to invoke update via CLI!"
         
-        wait_for_device(args.device, verbose=args.verbose)
-
-        busybar_storage_upload_dir_to_device((args.device, args.port), unpack_dir, dir_dst, unlock_bkp=unlock_bkp)
-
-        assert busybar_storage_verify_dir_on_device((args.device, args.port), unpack_dir, dir_dst), "Verification failed after upload!"
-
-        if args.save_as_recovery_only == False:
-            assert bsb_sysctl_debug_enable(args), "Failed to enable debug mode!"
-            assert bsb_invoke_update(args, dir_dst), "Failed to invoke update via CLI!"
-            
-    else:
-        logging.error("No update file found.")
-        return 1
     
 def run_update_from_recovery(args):
     logging.info("Running update from recovery...")
 
     wait_for_device(args.device, verbose=args.verbose)
 
-    assert bsb_sysctl_debug_enable(args), "Failed to enable debug mode!"
-    assert bsb_invoke_update(args, DIR_BSB_RECOVERY), "Failed to invoke update from recovery!"
+    assert bsb_sysctl_debug_enable(args.device, args.port), "Failed to enable debug mode!"
+    assert bsb_invoke_update(args.device, args.port, DIR_BSB_RECOVERY), "Failed to invoke update from recovery!"
 
 def run_wait_for_device(args):
     wait_for_device(args.device, verbose=args.verbose)
