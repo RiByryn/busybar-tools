@@ -82,6 +82,9 @@ These options affect only the process of selecting which bundle should be used, 
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
 
+## 0.5.2
+- Fix a bug with installing from local dir.
+
 ## 0.5.1
 - Support of Directory as a Source.
 - `--download-only` and `--unpack-only` options for `busybar install` command to just download or unpack the bundle without invoking update. The `--download-only` option is only applicable if the Update server used as a Source, while `--unpack-only` can be used with any source.

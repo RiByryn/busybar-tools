@@ -334,7 +334,7 @@ def run_install(args, verbose=False):
 
         if invoke_update == False:
             logging.warning("Will NOT invoke update after uploading the bundle on device!")
-        bsb_update_dst_dir = busybar_storage_upload_auto(args, unpacked_bundle_dir, save_as_recovery=args.save_as_recovery, warning_timeout=args.recovery_timeout)
+        bsb_update_dst_dir = busybar_storage_upload_auto(args, args.source_dir, save_as_recovery=args.save_as_recovery, warning_timeout=args.recovery_timeout)
 
         if invoke_update:
             return run_update_from_storage(args, bsb_update_dst_dir)
