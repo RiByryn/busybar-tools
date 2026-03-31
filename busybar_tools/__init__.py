@@ -359,6 +359,14 @@ def run_update_from_storage(args, update_dir):
 def run_update_from_recovery(args):
     return run_update_from_storage(args, DIR_BSB_RECOVERY)
 
+def run_update_local(args):
+    if args.from_recovery:
+        return run_update_from_recovery(args)
+    else:
+        if args.source_dir == "":
+            args.source_dir = DIR_BSB_TMP_UPDATE
+        return run_update_from_storage(args, args.source_dir)
+
 def bundle_unpack(source_file, unpack_dir):
     logging.info(f"Unpacking update bundle {source_file} to {unpack_dir}...")
     try:

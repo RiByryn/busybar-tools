@@ -9,6 +9,7 @@ from busybar_tools import (
     run_update_from_recovery,
     run_clean,
     run_cli_terminal,
+    run_update_local,
     run_wait_for_device,
     run_install,
 )
@@ -83,6 +84,13 @@ def busybar_main():
     p_install.add_argument("--recovery-timeout", dest="recovery_timeout", type=int, default=3, help="Time to wait for device to appear in recovery mode (seconds)")
 
     p_install.set_defaults(func=run_install, signed=True, via_storage=True)
+
+    p_update = subparsers.add_parser(
+        "update", help="Run update from BSB local storage"
+    )
+    p_update.add_argument("source_dir", help="Source directory on the device", type=str, default="", nargs='?')
+    p_update.add_argument("--recovery", dest="from_recovery", action="store_true", help="Run update from recovery partition instead of storage")
+    p_update.set_defaults(func=run_update_local)
 
     # p_write_recovery = subparsers.add_parser(
     #     "write-recovery", help="Write firmware bundle to /bkp/recovery on device"
