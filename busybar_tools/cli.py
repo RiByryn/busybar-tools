@@ -5,7 +5,7 @@ import logging
 from importlib.metadata import version
 
 from busybar_tools import (
-    run_update_via_storage,
+    run_update_from_storage,
     run_update_from_recovery,
     run_clean,
     run_cli_terminal,
@@ -78,7 +78,9 @@ def busybar_main():
     p_install.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Do not invoke update after saving the bundle on device (use with --save-as-recovery)")
 
     p_install.add_argument("--download-only", dest="download_only", action="store_true", help="Only download the firmware bundle, do not save or install it")
-    # p_install.add_argument("--unpack-only", dest="unpack_only", action="store_true", help="Only unpack the firmware bundle, do not save or install it (implies --download-only)")
+    p_install.add_argument("--unpack-only", dest="unpack_only", action="store_true", help="Only unpack the firmware bundle, do not save or install it (implies --download-only)")
+
+    p_install.add_argument("--recovery-timeout", dest="recovery_timeout", type=int, default=3, help="Time to wait for device to appear in recovery mode (seconds)")
 
     p_install.set_defaults(func=run_install, signed=True, via_storage=True)
 

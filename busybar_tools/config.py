@@ -19,5 +19,6 @@ U5_TARGET_HW_OPTIONS = [20, 21, 22]
 
 # Device Paths:
 DIR_BSB_TMP = "/ext/tmp"
+DIR_BSB_TMP_UPDATE = "/ext/tmp/update"
 DIR_BSB_RECOVERY = "/bkp/recovery"
 UPDATE_MANIFEST_FILE = "update.json"

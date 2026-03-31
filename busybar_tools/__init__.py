@@ -1,20 +1,11 @@
 #!/usr/bin/env python3
-import hashlib
 import os, sys, time
-import subprocess, argparse
 import shutil, platform
-import json
 
-
-import json
-import os
 import posixpath
-import re
 from urllib import request
 import logging
 
-import http.client
-import os
 from urllib.parse import urlparse
 
 from busybar_tools.helpers import (
@@ -25,7 +16,7 @@ from busybar_tools.bsb_term import run_session
 
 from busybar_tools.bsb_lite import BSB_Lite
 
-from busybar_tools.config import TCP_TIMEOUT_DEFAULT, DIR_BSB_TMP, DIR_BSB_RECOVERY, UPDATE_MANIFEST_FILE
+from busybar_tools.config import DIR_BSB_TMP_UPDATE, TCP_TIMEOUT_DEFAULT, DIR_BSB_TMP, DIR_BSB_RECOVERY, UPDATE_MANIFEST_FILE
 
 from busybar_tools.flipper.cli import Cli
 from busybar_tools.flipper.storage_socket import FlipperStorage
@@ -243,7 +234,7 @@ def busybar_get_index_by_url(base_url, target, work_dir):
     return index_parsed
 
 
-def busybar_get_file_by_filetype(source_url, file_type, work_dir, index_parsed):
+def busybar_download_file_by_filetype(source_url, file_type, work_dir, index_parsed):
     logging.info(f"Trying for file_type {file_type}...")
 
     file_path = None
@@ -271,17 +262,22 @@ def run_install(args, verbose=False):
             print(f"\t{arg}: {value}")
     
     args.source_file = None
+    args.source_dir = None
+
     if os.path.isfile(args.source):
         args.source_file = os.path.abspath(args.source)
         logging.info(f"Consdering Source as FILE: {args.source}, absolute path: {args.source_file}")
-    else:
+
+    if os.path.isdir(args.source):
+        args.source_dir = os.path.abspath(args.source)
+        logging.error(f"Consdering Source as DIR: {args.source}, absolute path: {args.source_dir}")
+    
+    else:   # URL
         args.source_url = busybar_update_url_normalize(args.source)
         logging.info(f"Consdering Source as URL: {args.source}, normalized URL: {args.source_url}")
 
         # Craft file_type, "(update|bkp)[_signed]_(tar|tgz)"
         file_type = f"{args.update_bundle_type}"
-        if args.save_as_recovery == True:
-            file_type = "bkp"
         if args.signed:
             file_type += "_signed" 
 
@@ -290,54 +286,59 @@ def run_install(args, verbose=False):
         index_parsed = busybar_get_index_by_url(args.source_url, args.target, work_dir)
 
         try:
-            args.source_file = busybar_get_file_by_filetype(args.source_url, f"{file_type}_tgz", work_dir, index_parsed)
+            args.source_file = busybar_download_file_by_filetype(args.source_url, f"{file_type}_tgz", work_dir, index_parsed)
         except Exception as e:
             logging.error(f"Failed to get file by type {file_type}_tgz: {e}")
         # Fallback to _tar if _tgz not found
         if args.source_file is None:
             try:
-                args.source_file = busybar_get_file_by_filetype(args.source_url, f"{file_type}_tar", work_dir, index_parsed)
+                args.source_file = busybar_download_file_by_filetype(args.source_url, f"{file_type}_tar", work_dir, index_parsed)
             except Exception as e:
                 logging.error(f"Failed to get file by type {file_type}_tar: {e}")
                 logging.error("No suitable update file found in index!")
                 return 1
-            
-    if args.download_only:
-        logging.info("Download only option specified, skipping installation.")
-        print(f"Downloaded file: {args.source_file}")
-        return 0
 
     if args.source_file:
-        print(f"Source file: {args.source_file}")
+        if args.download_only:
+            logging.info("Download only option specified, skipping installation.")
+            print(f"{args.source_file}")
+            return 0
 
         work_dir = busybar_workdir_get("local_file")
-        unpacked_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
+        unpacked_bundle_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
         # Clean up work dir before update to avoid confusion with old files
         try:
-            shutil.rmtree(unpacked_dir, ignore_errors=True)
+            shutil.rmtree(unpacked_bundle_dir, ignore_errors=True)
         except Exception as e:
-            logging.error(f"Error cleaning up {unpacked_dir}: {e}")
+            logging.error(f"Error cleaning up {unpacked_bundle_dir}: {e}")
             return 1
-        # sys.exit(0)
 
-        if args.via_storage == True:
-            save_as_recovery = False
-            invoke_update = True
-            if args.save_as_recovery == True:
-                logging.warning("Will save the update bundle as recovery bundle on device /bkp! This can be dangerous if the bundle is not correct!")
-                save_as_recovery = True
-                invoke_update = False
-            if args.invoke_update == False:
-                invoke_update = False
-            
-            if invoke_update == False:
-                logging.warning("Will NOT invoke update after uploading the bundle on device!")
-            return run_update_via_storage(args, work_dir, save_as_recovery=save_as_recovery, invoke_update=invoke_update)
-        else:
+        if args.via_storage == False:
             return run_update_via_http(args)
-    else:
-        logging.error("No source file available for update!")
-        return 1
+        else:
+            # Unpack
+            assert bundle_unpack(args.source_file, unpacked_bundle_dir) == 0
+            args.source_dir = unpacked_bundle_dir
+
+            if args.unpack_only:
+                logging.info("Unpack only option specified, skipping installation.")
+                print(f"{args.source_dir}")
+                return 0
+
+    if args.source_dir:
+        invoke_update = args.invoke_update
+        save_as_recovery = args.save_as_recovery
+        if args.save_as_recovery == True:
+            logging.warning("Saving unpacked bundle as recovery bundle on device /bkp! This can be dangerous if the bundle is not correct!")
+            invoke_update = False
+
+        if invoke_update == False:
+            logging.warning("Will NOT invoke update after uploading the bundle on device!")
+        bsb_update_dst_dir = busybar_storage_upload_auto(args, unpacked_bundle_dir, save_as_recovery=args.save_as_recovery, warning_timeout=args.recovery_timeout)
+
+        if invoke_update:
+            return run_update_from_storage(args, bsb_update_dst_dir)
+        
 
 def run_update_via_http(args):
     logging.info("Using HTTP transport for update...")
@@ -345,44 +346,49 @@ def run_update_via_http(args):
     bsb_sysctl_debug_enable(args.device, args.port)
     return busybar_api_update(args.device, args.source_file)
 
+def run_update_from_storage(args, update_dir):
+    logging.info(f"Running update via storage from {update_dir}...")
 
-def run_update_via_storage(args, work_dir, save_as_recovery=False, invoke_update=True):
+    wait_for_device(args.device, verbose=args.verbose)
+
+    assert bsb_sysctl_debug_enable(args.device, args.port), "Failed to enable debug mode!"
+    assert bsb_invoke_update(args.device, args.port, update_dir), "Failed to invoke update via CLI!"
+
+    return 0
+
+def run_update_from_recovery(args):
+    return run_update_from_storage(args, DIR_BSB_RECOVERY)
+
+def bundle_unpack(source_file, unpack_dir):
+    logging.info(f"Unpacking update bundle {source_file} to {unpack_dir}...")
+    try:
+        shutil.unpack_archive(source_file, unpack_dir)
+        logging.info(f"Unpacked: {os.listdir(unpack_dir)}")
+        return 0
+    except Exception as e:
+        logging.error(f"Failed to unpack bundle: {e}")
+        return 1
+
+def busybar_storage_upload_auto(args, unpacked_bundle_dir, save_as_recovery=False, warning_timeout=3):
     logging.info("Running update via storage...")
 
-    unpack_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
-
-    logging.info(f"Unpacking update bundle to {unpack_dir}...")
-    shutil.unpack_archive(args.source_file, unpack_dir)
-    logging.info(f"Unpacked: {os.listdir(unpack_dir)}")
-
-    dir_dst = DIR_BSB_TMP + "/update"
+    dir_dst = DIR_BSB_TMP_UPDATE
     unlock_bkp = False
     if save_as_recovery == True:
         logging.warning("Danger! Saving update bundle as recovery bundle on device /bkp!")
-        for i in range(3):
-            logging.warning(f"You have {3 - i} seconds to Cancel (Ctrl+C)...")
+        for i in range(warning_timeout):
+            logging.warning(f"You have {warning_timeout - i} seconds to Cancel (Ctrl+C)...")
             time.sleep(1)
         dir_dst = DIR_BSB_RECOVERY
         unlock_bkp = True
     
     wait_for_device(args.device, verbose=args.verbose)
 
-    busybar_storage_upload_dir_to_device((args.device, args.port), unpack_dir, dir_dst, unlock_bkp=unlock_bkp)
+    busybar_storage_upload_dir_to_device((args.device, args.port), unpacked_bundle_dir, dir_dst, unlock_bkp=unlock_bkp)
 
-    assert busybar_storage_verify_dir_on_device((args.device, args.port), unpack_dir, dir_dst), "Verification failed after upload!"
+    assert busybar_storage_verify_dir_on_device((args.device, args.port), unpacked_bundle_dir, dir_dst), "Verification failed after upload!"
 
-    if invoke_update == True:
-        assert bsb_sysctl_debug_enable(args.device, args.port), "Failed to enable debug mode!"
-        assert bsb_invoke_update(args.device, args.port, dir_dst), "Failed to invoke update via CLI!"
-        
-    
-def run_update_from_recovery(args):
-    logging.info("Running update from recovery...")
-
-    wait_for_device(args.device, verbose=args.verbose)
-
-    assert bsb_sysctl_debug_enable(args.device, args.port), "Failed to enable debug mode!"
-    assert bsb_invoke_update(args.device, args.port, DIR_BSB_RECOVERY), "Failed to invoke update from recovery!"
+    return dir_dst
 
 def run_wait_for_device(args):
     wait_for_device(args.device, verbose=args.verbose)
