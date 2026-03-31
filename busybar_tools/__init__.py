@@ -302,6 +302,11 @@ def run_install(args, verbose=False):
                 logging.error("No suitable update file found in index!")
                 return 1
             
+    if args.download_only:
+        logging.info("Download only option specified, skipping installation.")
+        print(f"Downloaded file: {args.source_file}")
+        return 0
+
     if args.source_file:
         print(f"Source file: {args.source_file}")
 

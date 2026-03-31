@@ -77,6 +77,9 @@ def busybar_main():
 
     p_install.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Do not invoke update after saving the bundle on device (use with --save-as-recovery)")
 
+    p_install.add_argument("--download-only", dest="download_only", action="store_true", help="Only download the firmware bundle, do not save or install it")
+    # p_install.add_argument("--unpack-only", dest="unpack_only", action="store_true", help="Only unpack the firmware bundle, do not save or install it (implies --download-only)")
+
     p_install.set_defaults(func=run_install, signed=True, via_storage=True)
 
     # p_write_recovery = subparsers.add_parser(
