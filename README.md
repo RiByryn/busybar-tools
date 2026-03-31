@@ -80,8 +80,12 @@ These options affect only the process of selecting which bundle should be used, 
 ## Upcoming features plan
 - Easy recovery via DFU from any possible broken state
 - Factory reset
-- Return back invokation of the update from the recovery bundle already located in `/bkp/recovery` on the device.
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
+
+## 0.5.1
+- Support of Directory as a Source.
+- `--download-only` and `--unpack-only` options for `busybar install` command to just download or unpack the bundle without invoking update. The `--download-only` option is only applicable if the Update server used as a Source, while `--unpack-only` can be used with any source.
+- Return back invokation of the update from the recovery bundle already located in `/bkp/recovery` on the device with `--recovery` arg.
 
 ## 0.5.0
 - `busybar update` and `busybar update-storage` commands now changed to `busybar install` (breaking change):
@@ -115,3 +119,4 @@ These options affect only the process of selecting which bundle should be used, 
 
 ## 0.1.0
 - Initial release (basic functionality for firmware update)
+
