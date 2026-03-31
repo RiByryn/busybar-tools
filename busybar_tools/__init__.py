@@ -270,7 +270,7 @@ def run_install(args, verbose=False):
 
     if os.path.isdir(args.source):
         args.source_dir = os.path.abspath(args.source)
-        logging.error(f"Consdering Source as DIR: {args.source}, absolute path: {args.source_dir}")
+        logging.info(f"Consdering Source as DIR: {args.source}, absolute path: {args.source_dir}")
     
     else:   # URL
         args.source_url = busybar_update_url_normalize(args.source)
