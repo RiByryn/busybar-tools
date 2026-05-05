@@ -43,9 +43,9 @@ def busybar_main():
     parser.add_argument("--version", action="version", version=f"busybar-tools {__version__}")
     # parser.add_argument("-v", "--verbose", help="Verbose", action="store_true")   # Always True currently
     
-    parser.add_argument("-d", "--device", help="Device IP", type=str, default=DEVICE_IP, action="store")
-    parser.add_argument("-p", "--port", help="Device Port", type=int, default=DEVICE_PORT, action="store")
-    parser.add_argument("-t", "--target", help="Target hardware", type=int, default=U5_TARGET_HW, action="store", choices=U5_TARGET_HW_OPTIONS)
+    parser.add_argument("-d", "--device", help=f"Device IP, default: {DEVICE_IP}", type=str, default=DEVICE_IP, action="store")
+    parser.add_argument("-p", "--port", help=f"Device Port, default: {DEVICE_PORT}", type=int, default=DEVICE_PORT, action="store")
+    parser.add_argument("-t", "--target", help=f"Target hardware, default: {U5_TARGET_HW}", type=int, default=U5_TARGET_HW, action="store", choices=U5_TARGET_HW_OPTIONS)
 
     parser.parse_known_args()
 

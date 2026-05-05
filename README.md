@@ -81,6 +81,10 @@ These options affect only the process of selecting which bundle should be used, 
 - Easy recovery via DFU from any possible broken state
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
+- Support of OS Windows
+
+## 0.6.0
+- Default U5_TARGET_HW is 22, that corresponds to the production BUSY Bar devices. Default firmware bundle is `--update` and `--signed`.
 
 ## 0.5.2
 - Fix a bug with installing from local dir.
