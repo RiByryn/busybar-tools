@@ -12,6 +12,7 @@ from busybar_tools import (
     run_update_local,
     run_wait_for_device,
     run_install,
+    run_storage,
 )
 
 from busybar_tools.helpers import (
@@ -117,6 +118,12 @@ def busybar_main():
         "clean", help="Clean package's tmp directory"
     )
     p_clean.set_defaults(func=run_clean)
+
+    p_storage = subparsers.add_parser(
+        "storage", help="Run embedded storage.py utility on the device"
+    )
+    p_storage.add_argument("storage_args", nargs=argparse.REMAINDER, help="Arguments passed to storage.py as-is")
+    p_storage.set_defaults(func=run_storage)
 
     # p_flash_u5_dfu = subparsers.add_parser(
     #     "flash-u5-dfu", help="Flash U5 firmware via DFU"

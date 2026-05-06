@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os, sys, time
 import shutil, platform
+import subprocess
 
 import posixpath
 from urllib import request
@@ -397,6 +398,23 @@ def busybar_storage_upload_auto(args, unpacked_bundle_dir, save_as_recovery=Fals
     assert busybar_storage_verify_dir_on_device((args.device, args.port), unpacked_bundle_dir, dir_dst), "Verification failed after upload!"
 
     return dir_dst
+
+def run_storage(args):
+    wait_for_device(args.device, verbose=args.verbose)
+    # storage.py located in current package.
+    # we invoke it as external command and pass all args to it, so it can handle the storage operations.
+    # Use sys.executable so the same interpreter (and its installed deps) is used —
+    # critical when busybar is installed via pipx into an isolated venv, since plain
+    # `python3` would resolve to the system interpreter without our dependencies.
+    # `-m` resolves the module via sys.path, so this is independent of the current working directory.
+    # print_pretty(args)
+    subargs = [
+        "-d", args.device,
+        "-p", str(args.port)
+    ]
+    cmd = [sys.executable, "-m", "busybar_tools.storage"] + args.storage_args + subargs
+    logging.info(f"Invoking command: {' '.join(cmd)}")
+    return subprocess.call(cmd)
 
 def run_wait_for_device(args):
     wait_for_device(args.device, verbose=args.verbose)

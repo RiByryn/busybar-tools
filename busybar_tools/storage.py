@@ -5,8 +5,8 @@ import filecmp
 import os
 import tempfile
 
-from flipper.app import App
-from flipper.storage_socket import FlipperStorage, FlipperStorageOperations
+from busybar_tools.flipper.app import App
+from busybar_tools.flipper.storage_socket import FlipperStorage, FlipperStorageOperations
 
 
 def WrapStorageOp(func):

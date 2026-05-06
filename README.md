@@ -56,10 +56,10 @@ These options affect only the process of selecting which bundle should be used, 
 - `busybar install` - Update to the latest firmware from the `dev` branch. Signed version of the bundle will be used by default.
 - `busybar install busybar-f22-bkp_signed-dev-26032026-1e061661.tgz` - Update using a local file. The file can be either `.tar` or `.tgz` format.
 - `busybar install --unsigned dev` - Update to firmware from the desired branch using unsigned bundle. This can be useful for testing custom builds, but all production devices must use only signed bundles.
-- `busybar install --unsigned 0.7.2` - Update to a specific TAG version (e.g., `0.7.2` release).
+- `busybar install --unsigned 0.8.1` - Update to a specific TAG version (e.g., `0.8.1` release).
 - `busybar install --unsigned factory` - Update to firmware from the desired (e.g., `factory`) branch.
 - `busybar -d 10.0.5.20 install vanyww/642-clock-app-overlay-effect` - Update device with a custom address to the desired branch.
-- `busybar install https://update.flipperzero.one/builds/busybar-firmware/0.7.2/` - Update using a direct URL to the folder with build artifacts.
+- `busybar install https://update.flipperzero.one/builds/busybar-firmware/0.8.1/` - Update using a direct URL to the folder with build artifacts.
 - `busybar -d 10.0.5.20 update` - Specify a custom device IP address.
 
 
@@ -68,10 +68,14 @@ These options affect only the process of selecting which bundle should be used, 
 - `busybar cli` - Start a terminal session to the BUSY Bar device. Press `Ctrl+]` to exit the session.
 - `busybar -d 10.0.5.20 -p 23 cli` - Start a terminal session to the BUSY Bar device with a custom IP address and Port.
 
+### Embedded storage.py tool
+
+- `busybar storage <storage.py args>` - Work with BUSY Bar storage via embedded storage.py tool. You can use following commands directly: mkdir, format_ext, remove, read, size, receive, send, list.
+
 ### Other options:
 
 - `busybar wait`: Wait for the device to be available. This can be useful for scripting.
-- `busybar install --save-as-recovery 0.7.2` - Write factory bundle to the recovery partition. This is a **DANGEROUS** operation, as it can potentially brick the device. Usage is not recommended for regular users.
+- `busybar install --save-as-recovery 0.8.1` - Write factory bundle to the recovery partition. This is a **DANGEROUS** operation, as it can potentially brick the device. Usage is not recommended for regular users.
 
 ---
 
@@ -82,6 +86,9 @@ These options affect only the process of selecting which bundle should be used, 
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
 - Support of OS Windows
+
+## 0.6.1
+- Embedded storage.py tool to manage storage of your device from any terminal with `busybar storage <storage.py args>` command. You can use following commands directly: mkdir, format_ext, remove, read, size, receive, send, list.
 
 ## 0.6.0
 - Default U5_TARGET_HW is 22, that corresponds to the production BUSY Bar devices. Default firmware bundle is `--update` and `--signed`.
