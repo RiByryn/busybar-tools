@@ -66,22 +66,6 @@ def _run_session_posix(host: str, port: int, tcp_timeout: int) -> None:
         # Restore terminal attributes
         termios.tcsetattr(fd, termios.TCSADRAIN, orig_attrs)
 
-def _enable_windows_vt_mode() -> bool:
-    import ctypes
-    from ctypes import wintypes
-    STD_OUTPUT_HANDLE = -11
-    ENABLE_PROCESSED_OUTPUT = 0x0001
-    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
-    kernel32 = ctypes.windll.kernel32
-    h = kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
-    if h in (0, ctypes.c_void_p(-1).value):
-        return False
-    mode = wintypes.DWORD()
-    if not kernel32.GetConsoleMode(h, ctypes.byref(mode)):
-        return False
-    return bool(kernel32.SetConsoleMode(
-        h, mode.value | ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING))
-
 
 def _enable_windows_vt_mode() -> bool:
     # Make the Windows console interpret ANSI escape sequences instead of
