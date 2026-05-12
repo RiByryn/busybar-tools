@@ -93,7 +93,6 @@ def _enable_windows_vt_mode() -> bool:
 
 
 def _run_session_windows(host: str, port: int, tcp_timeout: int) -> None:
-    _enable_windows_vt_mode()
     # Map Windows extended key scan codes to ANSI escape sequences
     _EXT_KEY_MAP = {
         "\x48": b"\x1b[A",   # Up arrow
