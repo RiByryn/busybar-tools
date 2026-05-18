@@ -12,6 +12,17 @@ import re, hashlib
 import subprocess, time
 
 from busybar_tools.config import PROJECT_NAME, FETCH_TIMEOUT_DEFAULT, UPDATE_SERVER_BASE
+
+
+def _ping_command(host, timeout):
+    timeout = max(1, int(timeout))
+    system = platform.system()
+    if system == "Windows":
+        timeout_ms = max(1000, timeout * 1000)
+        return ["ping", "-n", "1", "-w", str(timeout_ms), host]
+    if system == "Darwin":
+        return ["ping", "-c", "1", "-t", str(timeout), host]
+    return ["ping", "-c", "1", "-W", str(timeout), host]
     
 def setup_logging():
     logger = logging.getLogger()
@@ -57,7 +68,7 @@ def print_pretty(data, return_instead_of_print=False):
 def network_ping_bool(host, timeout=1, verbose=False):
     try:
         output = subprocess.check_output(
-            ["ping", "-c", "1", "-t", str(timeout), host],
+            _ping_command(host, timeout),
             stderr=subprocess.STDOUT,
             universal_newlines=True,
         )
