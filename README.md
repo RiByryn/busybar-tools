@@ -13,10 +13,11 @@ Available as a Python package on [PyPI](https://pypi.org/project/busybar-tools/)
 
 ## Installation and Upgrade
 
-    brew install pipx           # MacOS (Homebrew)
     sudo apt install pipx       # Ubuntu/Debian
-    winget install pipx         # Windows
-    pipx ensurepath             # Optional step to ensure pipx binaries are in PATH
+    brew install pipx           # MacOS (Homebrew, https://brew.sh/)
+    scoop install pipx          # Windows (Scoop, https://scoop.sh/)
+
+    pipx ensurepath             # Optional step to ensure pipx binaries are in PATH, for all OS.
     # If you haven't install `pipx` before, you will NEED to open a new terminal before continuing.
 
     pipx install busybar-tools
@@ -86,7 +87,9 @@ These options affect only the process of selecting which bundle should be used, 
 - Easy recovery via DFU from any possible broken state
 - Factory reset
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
-- Support of OS Windows
+
+## 0.7.0
+- Windows support (cli, install, storage)
 
 ## 0.6.1
 - Embedded storage.py tool to manage storage of your device from any terminal with `busybar storage <storage.py args>` command. You can use following commands directly: mkdir, format_ext, remove, read, size, receive, send, list.
