@@ -148,6 +148,10 @@ def busybar_main():
 
 def main():
     setup_logging()
+    
+    if sys.platform == "win32":
+        from busybar_tools.bsb_term import _enable_windows_vt_mode
+        _enable_windows_vt_mode()
 
     try:
         ret = busybar_main()
