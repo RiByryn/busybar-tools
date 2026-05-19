@@ -1,4 +1,5 @@
 # BUSY Bar Tools
+[![PyPI](https://img.shields.io/pypi/v/busybar-tools.svg)](https://pypi.org/project/busybar-tools/) [![Python Versions](https://img.shields.io/pypi/pyversions/busybar-tools.svg)](https://pypi.org/project/busybar-tools/)
 
 Command-line (CLI) tools to manage your BUSY Bar device.
 
