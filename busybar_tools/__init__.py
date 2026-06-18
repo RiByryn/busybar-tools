@@ -24,6 +24,14 @@ from busybar_tools.flipper.storage_socket import FlipperStorage
 
 UNPACKED_DIR_NAME = "unpacked"
 
+
+def wait_for_device_maybe(args):
+    """Wait for the device to be reachable, unless --no-wait was passed."""
+    if getattr(args, "no_wait", False):
+        logging.info("Skipping device reachability check (--no-wait).")
+        return
+    wait_for_device(args.device, verbose=getattr(args, "verbose", True))
+
 def busybar_storage_upload_dir_to_device(device, dir_src, dir_dst, unlock_bkp=False):
     def flipper_mkdir_p(storage, path: str):
         """Create directory and parents on Flipper (mkdir -p semantics).
@@ -189,7 +197,7 @@ def bsb_invoke_update(device, port, file_path):
 def run_cli_terminal(args):
     logging.info("Running CLI terminal...")
 
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
 
     timeout = TCP_TIMEOUT_DEFAULT
 
@@ -257,100 +265,176 @@ def busybar_download_file_by_filetype(source_url, file_type, work_dir, index_par
     
     return file_path
 
+def resolve_source(args):
+    """Determine the firmware source and download it if needed.
+
+    Priority order (first match wins):
+      1. existing local file       -> (source_file, None)
+      2. existing local directory  -> (None, source_dir)   # already-unpacked bundle
+      3. otherwise treat the string as a URL / tag / branch of the update server,
+         build the URL and download the matching bundle -> (source_file, None)
+
+    An explicit http/https URL naturally lands in branch 3, since it is neither a
+    local file nor a local dir. Exactly one of the returned values is set.
+    Raises RuntimeError if a remote bundle could not be found/downloaded.
+    """
+    if os.path.isfile(args.source):
+        source_file = os.path.abspath(args.source)
+        logging.info(f"Considering source as FILE: {args.source} -> {source_file}")
+        return source_file, None
+
+    if os.path.isdir(args.source):
+        source_dir = os.path.abspath(args.source)
+        logging.info(f"Considering source as DIR: {args.source} -> {source_dir}")
+        return None, source_dir
+
+    # URL / tag / branch of the update server.
+    args.source_url = busybar_update_url_normalize(args.source)
+    logging.info(f"Considering source as URL/tag/branch: {args.source} -> {args.source_url}")
+
+    # Craft file_type, "(update|bkp)[_signed]_(tgz|tar)"
+    file_type = f"{args.update_bundle_type}"
+    if args.signed:
+        file_type += "_signed"
+
+    if getattr(args, "save_as_recovery", False) and args.update_bundle_type != "bkp":
+        logging.warning(
+            f"--save-as-recovery is normally used with --bkp (the bundle type designed for the "
+            f"recovery partition); proceeding with '{args.update_bundle_type}' bundle anyway."
+        )
+
+    work_dir = busybar_workdir_get(url_to_dir_name(args.source_url))
+    index_parsed = busybar_get_index_by_url(args.source_url, args.target, work_dir)
+
+    source_file = None
+    try:
+        source_file = busybar_download_file_by_filetype(args.source_url, f"{file_type}_tgz", work_dir, index_parsed)
+    except Exception as e:
+        logging.error(f"Failed to get file by type {file_type}_tgz: {e}")
+    # Fallback to _tar if _tgz not found
+    if source_file is None:
+        try:
+            source_file = busybar_download_file_by_filetype(args.source_url, f"{file_type}_tar", work_dir, index_parsed)
+        except Exception as e:
+            logging.error(f"Failed to get file by type {file_type}_tar: {e}")
+
+    if source_file is None:
+        raise RuntimeError(f"No suitable update file ({file_type}_tgz/_tar) found in index for {args.source_url}")
+
+    return source_file, None
+
+
+def unpack_bundle(source_file):
+    """Unpack a bundle archive into a clean work dir; return the unpacked dir path."""
+    work_dir = busybar_workdir_get("local_file")
+    unpacked_bundle_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
+    # Clean up work dir before unpack to avoid confusion with old files
+    shutil.rmtree(unpacked_bundle_dir, ignore_errors=True)
+    assert bundle_unpack(source_file, unpacked_bundle_dir) == 0
+    return unpacked_bundle_dir
+
+
+def _place_result(src_path, output):
+    """Copy a fetched file/dir to `output` (a dir or a file path); return the final path.
+
+    If `output` is falsy, leave the result in the cache and return src_path as-is.
+    """
+    if not output:
+        return src_path
+
+    output = os.path.abspath(os.path.expanduser(output))
+
+    if os.path.isdir(src_path):
+        os.makedirs(output, exist_ok=True)
+        shutil.copytree(src_path, output, dirs_exist_ok=True)
+        return output
+
+    # src is a file: treat trailing-slash / existing dir as a destination directory.
+    if output.endswith(("/", os.sep)) or os.path.isdir(output):
+        os.makedirs(output, exist_ok=True)
+        dst = os.path.join(output, os.path.basename(src_path))
+    else:
+        parent = os.path.dirname(output)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        dst = output
+    shutil.copy2(src_path, dst)
+    return dst
+
+
 def run_install(args, verbose=False):
     if verbose:
         for arg, value in vars(args).items():
             print(f"\t{arg}: {value}")
-    
-    args.source_file = None
-    args.source_dir = None
 
-    if os.path.isfile(args.source):
-        args.source_file = os.path.abspath(args.source)
-        logging.info(f"Consdering Source as FILE: {args.source}, absolute path: {args.source_file}")
+    source_file, source_dir = resolve_source(args)
+    args.source_file = source_file
+    args.source_dir = source_dir
 
-    if os.path.isdir(args.source):
-        args.source_dir = os.path.abspath(args.source)
-        logging.info(f"Consdering Source as DIR: {args.source}, absolute path: {args.source_dir}")
-    
-    else:   # URL
-        args.source_url = busybar_update_url_normalize(args.source)
-        logging.info(f"Consdering Source as URL: {args.source}, normalized URL: {args.source_url}")
-
-        # Craft file_type, "(update|bkp)[_signed]_(tar|tgz)"
-        file_type = f"{args.update_bundle_type}"
-        if args.signed:
-            file_type += "_signed" 
-
-        work_dir = busybar_workdir_get(url_to_dir_name(args.source_url))
-
-        index_parsed = busybar_get_index_by_url(args.source_url, args.target, work_dir)
-
-        try:
-            args.source_file = busybar_download_file_by_filetype(args.source_url, f"{file_type}_tgz", work_dir, index_parsed)
-        except Exception as e:
-            logging.error(f"Failed to get file by type {file_type}_tgz: {e}")
-        # Fallback to _tar if _tgz not found
-        if args.source_file is None:
-            try:
-                args.source_file = busybar_download_file_by_filetype(args.source_url, f"{file_type}_tar", work_dir, index_parsed)
-            except Exception as e:
-                logging.error(f"Failed to get file by type {file_type}_tar: {e}")
-                logging.error("No suitable update file found in index!")
-                return 1
-
-    if args.source_file:
-        if args.download_only:
-            logging.info("Download only option specified, skipping installation.")
-            print(f"{args.source_file}")
-            return 0
-
-        work_dir = busybar_workdir_get("local_file")
-        unpacked_bundle_dir = os.path.join(work_dir, UNPACKED_DIR_NAME)
-        # Clean up work dir before update to avoid confusion with old files
-        try:
-            shutil.rmtree(unpacked_bundle_dir, ignore_errors=True)
-        except Exception as e:
-            logging.error(f"Error cleaning up {unpacked_bundle_dir}: {e}")
-            return 1
-
+    if source_file:
+        # HTTP transport installs the archive directly, without a local unpack.
         if args.via_storage == False:
             return run_update_via_http(args)
-        else:
-            # Unpack
-            assert bundle_unpack(args.source_file, unpacked_bundle_dir) == 0
-            args.source_dir = unpacked_bundle_dir
+        source_dir = unpack_bundle(source_file)
+        args.source_dir = source_dir
 
-            if args.unpack_only:
-                logging.info("Unpack only option specified, skipping installation.")
-                print(f"{args.source_dir}")
-                return 0
+    if source_dir:
+        return _install_from_dir(args, source_dir)
 
-    if args.source_dir:
-        invoke_update = args.invoke_update
-        save_as_recovery = args.save_as_recovery
-        if args.save_as_recovery == True:
-            logging.warning("Saving unpacked bundle as recovery bundle on device /bkp! This can be dangerous if the bundle is not correct!")
-            invoke_update = False
+    return 0
 
-        if invoke_update == False:
-            logging.warning("Will NOT invoke update after uploading the bundle on device!")
-        bsb_update_dst_dir = busybar_storage_upload_auto(args, args.source_dir, save_as_recovery=args.save_as_recovery, warning_timeout=args.recovery_timeout)
 
-        if invoke_update:
-            return run_update_from_storage(args, bsb_update_dst_dir)
-        
+def _install_from_dir(args, source_dir):
+    invoke_update = args.invoke_update
+    if args.save_as_recovery == True:
+        logging.warning("Saving unpacked bundle as recovery bundle on device /bkp! This can be dangerous if the bundle is not correct!")
+        invoke_update = False
+
+    if invoke_update == False:
+        logging.warning("Will NOT invoke update after uploading the bundle on device!")
+
+    bsb_update_dst_dir = busybar_storage_upload_auto(args, source_dir, save_as_recovery=args.save_as_recovery, warning_timeout=args.recovery_timeout)
+
+    if invoke_update:
+        return run_update_from_storage(args, bsb_update_dst_dir)
+    return 0
+
+
+def run_fetch(args):
+    """Fetch a firmware bundle locally without touching the device.
+
+    Reuses resolve_source (+ unpack_bundle) shared with install.
+    Without --unpack: download only. With --unpack: download and unpack.
+    Result is placed into --output if given, otherwise left in the cache.
+    The final path is printed to stdout.
+    """
+    source_file, source_dir = resolve_source(args)
+
+    if getattr(args, "unpack", False):
+        # A directory source is already unpacked; otherwise unpack the bundle file.
+        result = unpack_bundle(source_file) if source_file is not None else source_dir
+    else:
+        # Download-only: prefer the bundle file; a directory source has nothing to fetch.
+        result = source_file if source_file is not None else source_dir
+
+    output = getattr(args, "output", None)
+    result = _place_result(result, output)
+    if output:
+        action = "Fetched and unpacked" if getattr(args, "unpack", False) else "Fetched"
+        logging.info(f"{action} '{args.source}' to: {result}")
+    print(result)
+    return 0
 
 def run_update_via_http(args):
     logging.info("Using HTTP transport for update...")
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
     bsb_sysctl_debug_enable(args.device, args.port)
     return busybar_api_update(args.device, args.source_file)
 
 def run_update_from_storage(args, update_dir):
     logging.info(f"Running update via storage from {update_dir}...")
 
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
 
     assert bsb_sysctl_debug_enable(args.device, args.port), "Failed to enable debug mode!"
     assert bsb_invoke_update(args.device, args.port, update_dir), "Failed to invoke update via CLI!"
@@ -361,12 +445,12 @@ def run_update_from_recovery(args):
     return run_update_from_storage(args, DIR_BSB_RECOVERY)
 
 def run_update_local(args):
-    if args.from_recovery:
+    target = args.device_path
+    if target == "recovery":
         return run_update_from_recovery(args)
-    else:
-        if args.source_dir == "":
-            args.source_dir = DIR_BSB_TMP_UPDATE
-        return run_update_from_storage(args, args.source_dir)
+    if not target:
+        target = DIR_BSB_TMP_UPDATE
+    return run_update_from_storage(args, target)
 
 def bundle_unpack(source_file, unpack_dir):
     logging.info(f"Unpacking update bundle {source_file} to {unpack_dir}...")
@@ -391,7 +475,7 @@ def busybar_storage_upload_auto(args, unpacked_bundle_dir, save_as_recovery=Fals
         dir_dst = DIR_BSB_RECOVERY
         unlock_bkp = True
     
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
 
     busybar_storage_upload_dir_to_device((args.device, args.port), unpacked_bundle_dir, dir_dst, unlock_bkp=unlock_bkp)
 
@@ -400,7 +484,7 @@ def busybar_storage_upload_auto(args, unpacked_bundle_dir, save_as_recovery=Fals
     return dir_dst
 
 def run_storage(args):
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
     # storage.py located in current package.
     # we invoke it as external command and pass all args to it, so it can handle the storage operations.
     # Use sys.executable so the same interpreter (and its installed deps) is used —
@@ -408,16 +492,21 @@ def run_storage(args):
     # `python3` would resolve to the system interpreter without our dependencies.
     # `-m` resolves the module via sys.path, so this is independent of the current working directory.
     # print_pretty(args)
-    subargs = [
-        "-d", args.device,
-        "-p", str(args.port)
+    # Map busybar device selection onto storage.py: --device -> --host, --port -> -p (TCP port).
+    # These must precede the storage.py sub-command, so prepend them and drop a leading "--".
+    device_args = [
+        "--host", args.device,
+        "-p", str(args.port),
     ]
-    cmd = [sys.executable, "-m", "busybar_tools.storage"] + args.storage_args + subargs
+    storage_args = list(args.storage_args)
+    if storage_args and storage_args[0] == "--":
+        storage_args = storage_args[1:]
+    cmd = [sys.executable, "-m", "busybar_tools.storage"] + device_args + storage_args
     logging.info(f"Invoking command: {' '.join(cmd)}")
     return subprocess.call(cmd)
 
 def run_wait_for_device(args):
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
 
 def run_clean(args):
     dir = busybar_workdir_get()
