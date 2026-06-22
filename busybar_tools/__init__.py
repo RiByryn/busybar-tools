@@ -342,6 +342,8 @@ def _place_result(src_path, output):
     if not output:
         return src_path
 
+    # Note the trailing-slash intent before abspath() strips it.
+    wants_dir = output.endswith(("/", os.sep))
     output = os.path.abspath(os.path.expanduser(output))
 
     if os.path.isdir(src_path):
@@ -350,7 +352,7 @@ def _place_result(src_path, output):
         return output
 
     # src is a file: treat trailing-slash / existing dir as a destination directory.
-    if output.endswith(("/", os.sep)) or os.path.isdir(output):
+    if wants_dir or os.path.isdir(output):
         os.makedirs(output, exist_ok=True)
         dst = os.path.join(output, os.path.basename(src_path))
     else:
@@ -545,8 +547,6 @@ def run_fetch(args):
     The final path is printed to stdout.
     """
     source_file, source_dir = resolve_source(args)
-
-    # TODO not working as intended actually
 
     if getattr(args, "unpack", False):
         # A directory source is already unpacked; otherwise unpack the bundle file.
