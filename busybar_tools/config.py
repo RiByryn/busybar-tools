@@ -14,8 +14,7 @@ DEVICE_IP_REF = "10.0.5.20" # misc
 DEVICE_PORT = 23
 
 # Firmware U5 target:
-U5_TARGET_HW = 22   # Default, can be overridden by -t / --target option.
-U5_TARGET_HW_OPTIONS = [20, 21, 22]
+U5_TARGET_HW = 22   # Default, can be overridden by -t / --target option (any integer accepted).
 
 # Device Paths:
 DIR_BSB_TMP = "/ext/tmp"

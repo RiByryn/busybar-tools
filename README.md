@@ -79,7 +79,7 @@ Examples:
 ### `busybar install`
 
     busybar install [--update | --bkp] [--signed | --unsigned] [--via-storage | --via-http]
-                    [--no-invoke-update] [-t {20,21,22}] [-d DEVICE] [-p PORT] source
+                    [--no-invoke-update] [-t TARGET] [-d DEVICE] [-p PORT] source
 
 For bracketed pairs, **the first option is the default**.
 
@@ -94,7 +94,7 @@ For bracketed pairs, **the first option is the default**.
 These options choose **which bundle to take from the update server**; they are ignored when
 the source is a local file or directory.
 
-- `-t`, `--target {20,21,22}` — target hardware version (default: `22`; all production devices are at least `22`).
+- `-t`, `--target TARGET` — target hardware version (default: `22`; all production devices are at least `22`). Any integer is accepted; it must exist on the update server.
 - `--update` | `--bkp` — bundle type. `--update` (default) is the regular user firmware; `--bkp`
   is a recovery bundle (with welcome animations). A `--bkp` bundle can also be installed as regular firmware.
 - `--signed` | `--unsigned` — bundle signature. Signed is the default; production devices must use only signed bundles.
@@ -124,7 +124,7 @@ the source is a local file or directory.
 Download (and optionally unpack) a firmware bundle **locally, without touching the device**.
 Accepts the same `source` and firmware-selection options as `install` (`-t`, `--update/--bkp`, `--signed/--unsigned`).
 
-    busybar fetch [--update | --bkp] [--signed | --unsigned] [-t {20,21,22}]
+    busybar fetch [--update | --bkp] [--signed | --unsigned] [-t TARGET]
                   [--unpack] [-o OUTPUT] source
 
 - `--unpack` — also unpack the downloaded bundle.
@@ -158,7 +158,7 @@ Acquire a firmware bundle (same `source` and firmware-selection options as `inst
 the device recovery partition (`/bkp`), **without installing it**. This is the bundle that gets applied on a
 factory reset. **DANGER**: an incorrect bundle here can brick the device — not recommended for regular users.
 
-    busybar write-recovery [--bkp | --update] [--signed | --unsigned] [-t {20,21,22}]
+    busybar write-recovery [--bkp | --update] [--signed | --unsigned] [-t TARGET]
                            [-d DEVICE] [-p PORT] [--no-wait] [--confirm-timeout SECONDS] source
 
 - Defaults to the `--bkp` bundle type (purpose-built for the recovery partition). Using `--update` is
@@ -209,6 +209,8 @@ Available storage sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`,
   update bundle, installs it, and reports the version change. Accepts only an update-server tag/branch/URL.
 - `install` / `fetch` / `write-recovery` now **require an explicit `source`** (the `dev` default was
   removed; it now lives in `auto-install`).
+- `-t/--target` is no longer restricted to a fixed list — it accepts any integer target supported by
+  the update server (default still `22`).
 - CLI restructure for clarity and consistency (**breaking change**):
     - Options are now scoped to the command they affect and go **after** the command
       (e.g. `busybar install -t 21 dev` instead of `busybar -t 21 install`). `-d`/`-p`/`-t` are no longer global.

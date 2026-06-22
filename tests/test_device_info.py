@@ -21,6 +21,11 @@ def test_target_parsed_as_int():
     assert bt.device_info_target(BASE_INFO) == 22
 
 
+def test_target_accepts_nonstandard_value():
+    # No closed list: a target outside {20,21,22} is returned as-is.
+    assert bt.device_info_target(dict(BASE_INFO, u5_firmware_target="23")) == 23
+
+
 def test_target_missing_raises():
     with pytest.raises(RuntimeError):
         bt.device_info_target({})

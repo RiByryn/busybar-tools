@@ -3,6 +3,7 @@ import sys
 
 import pytest
 
+import busybar_tools.cli as cli
 from busybar_tools.cli import busybar_main
 
 
@@ -22,6 +23,20 @@ def test_auto_install_rejects_firmware_flags(monkeypatch):
     # autodetect-only: no -t override allowed
     with pytest.raises(SystemExit):
         run_cli(monkeypatch, ["auto-install", "-t", "22", "dev"])
+
+
+def test_install_accepts_arbitrary_target(monkeypatch):
+    # The closed {20,21,22} list was removed; any integer target must now parse.
+    captured = {}
+
+    def fake_install(args):
+        captured["target"] = args.target
+        return 0
+
+    monkeypatch.setattr(cli, "run_install", fake_install)
+    ret = run_cli(monkeypatch, ["install", "-t", "23", "dev"])
+    assert ret == 0
+    assert captured["target"] == 23
 
 
 def test_install_signed_and_unsigned_are_mutually_exclusive(monkeypatch):

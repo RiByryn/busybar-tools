@@ -25,7 +25,6 @@ from busybar_tools.config import (
     DEVICE_IP_REF,
     DEVICE_PORT,
     U5_TARGET_HW,
-    U5_TARGET_HW_OPTIONS,
     UPDATE_DEFAULT_BRANCH
 )
 
@@ -40,7 +39,7 @@ TOP_EPILOG = """\
 examples:
   busybar auto-install                     recommended: autodetect & install latest dev firmware
   busybar auto-install 0.10.2              autodetect target/signing, install a specific tag
-  busybar install -t 21 --unsigned 0.10.2  low-level: install a specific tag for hw target 21
+  busybar install -t 22 --unsigned 0.10.2  low-level: install a specific tag for hw target 22
   busybar write-recovery 0.10.2            store a bkp bundle into the recovery partition
   busybar fetch 0.10.2 -o ~/fw/            download a bundle into a local directory
   busybar install-onboard recovery         install firmware already on the device's recovery
@@ -48,7 +47,6 @@ examples:
   busybar storage -d 10.0.4.20 -- list /ext
 
 Most users want `busybar auto-install`. The other commands are explicit/low-level.
-Options that affect a command are placed on that command (e.g. `busybar install -t 21 0.10.2`).
 Use `busybar <command> --help` for command-specific options.
 """
 
@@ -85,7 +83,7 @@ def _make_firmware_opts():
     p.add_argument("source", help=SOURCE_HELP, type=str)
 
     g = p.add_argument_group("firmware selection (update server only)")
-    g.add_argument("-t", "--target", help=f"Target hardware version, default: {U5_TARGET_HW}", type=int, default=U5_TARGET_HW, choices=U5_TARGET_HW_OPTIONS)
+    g.add_argument("-t", "--target", help=f"Target hardware version (default: {U5_TARGET_HW}). Any integer; must exist on the update server.", type=int, default=U5_TARGET_HW)
 
     # Bundle type: update (default) vs bkp. Canonical build-server artifact names.
     bundle_type = g.add_mutually_exclusive_group()
