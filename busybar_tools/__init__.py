@@ -362,6 +362,127 @@ def _place_result(src_path, output):
     return dst
 
 
+def device_read_info(device, port, retries=1, delay=2):
+    """Connect to the device CLI and return the parsed device_info dict (with retries)."""
+    last = None
+    for attempt in range(retries):
+        try:
+            with BSB_Lite((device, port)) as bsb:
+                return bsb.device_info()
+        except Exception as e:
+            last = e
+            logging.debug(f"device_info attempt {attempt + 1}/{retries} failed: {e}")
+            if attempt + 1 < retries:
+                time.sleep(delay)
+    raise RuntimeError(f"Failed to read device_info from {device}:{port}: {last}")
+
+
+def _device_info_bool(info, key):
+    val = info.get(key)
+    if val is None:
+        raise RuntimeError(f"device_info is missing '{key}'")
+    return str(val).strip().lower() == "true"
+
+
+def device_info_target(info):
+    """Hardware target (20/21/22) reported by the device."""
+    try:
+        return int(info["u5_firmware_target"])
+    except (KeyError, ValueError):
+        raise RuntimeError("Could not read hardware target (u5_firmware_target) from device_info")
+
+
+def device_info_signed(info):
+    """Whether the device runs signed firmware (secure boot enabled on both cores).
+
+    sl_nwp_secureboot and sl_m4_secureboot must agree; an inconsistent state is an error.
+    """
+    nwp = _device_info_bool(info, "sl_nwp_secureboot")
+    m4 = _device_info_bool(info, "sl_m4_secureboot")
+    if nwp != m4:
+        raise RuntimeError(
+            f"Inconsistent secure boot state (sl_nwp_secureboot={nwp}, sl_m4_secureboot={m4}); "
+            "cannot decide signed/unsigned automatically."
+        )
+    return nwp
+
+
+_VERSION_FIELDS = (
+    "u5_firmware_branch", "u5_firmware_commit", "u5_firmware_builddate",
+    "sl_firmware_branch", "sl_firmware_commit", "sl_firmware_builddate",
+)
+
+
+def device_version_fingerprint(info):
+    """Tuple of version-identifying fields, for before/after comparison."""
+    return tuple(info.get(k, "?") for k in _VERSION_FIELDS)
+
+
+def format_version(info):
+    """Human-readable firmware version string from device_info."""
+    return (
+        f"u5 {info.get('u5_firmware_branch', '?')}@{info.get('u5_firmware_commit', '?')} "
+        f"({info.get('u5_firmware_builddate', '?')}), "
+        f"sl {info.get('sl_firmware_branch', '?')}@{info.get('sl_firmware_commit', '?')} "
+        f"({info.get('sl_firmware_builddate', '?')})"
+    )
+
+
+def run_auto_install(args):
+    """High-level automatic install for regular users.
+
+    Reads device_info to autodetect the hardware target and whether signed firmware is required,
+    fetches the matching regular update bundle from the update server, installs it, waits for the
+    device to reboot and reports the version change.
+
+    Only update-server sources (tag/branch/URL) are supported: a local file/dir would bypass the
+    target/signed autodetection.
+    """
+    if os.path.isfile(args.source) or os.path.isdir(args.source):
+        logging.error(
+            f"auto-install works only with an update-server tag/branch or URL, not a local "
+            f"file/directory ('{args.source}'). Use 'install' for a local source."
+        )
+        return 1
+
+    wait_for_device(args.device, verbose=args.verbose)
+
+    logging.info("Reading device info...")
+    info_before = device_read_info(args.device, args.port)
+
+    target = device_info_target(info_before)
+    signed = device_info_signed(info_before)
+    logging.info(
+        f"Detected: target {target}, {'signed' if signed else 'unsigned'} firmware. "
+        f"Current version: {format_version(info_before)}"
+    )
+
+    # Drive the regular install pipeline from the autodetected values.
+    args.target = target
+    args.signed = signed
+    args.update_bundle_type = "update"
+    args.via_storage = True
+    args.invoke_update = True
+
+    ret = run_install(args)
+    if ret:
+        return ret
+
+    logging.info("Waiting for the device to reboot and come back...")
+    # First let it go offline (bounded), then wait for it to be reachable again.
+    wait_for_device(args.device, timeout=60, verbose=args.verbose, success_ping_as=False)
+    wait_for_device(args.device, verbose=args.verbose)
+
+    info_after = device_read_info(args.device, args.port, retries=5, delay=2)
+
+    if device_version_fingerprint(info_before) == device_version_fingerprint(info_after):
+        print(f"Already up to date — reinstalled the same build:\n  {format_version(info_after)}")
+    else:
+        print(f"Updated from:\n  {format_version(info_before)}\nto:\n  {format_version(info_after)}")
+    print("Done. You are magnificent! ✨")
+    return 0
+
+
 def run_install(args, verbose=False):
     if verbose:
         for arg, value in vars(args).items():

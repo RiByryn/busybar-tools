@@ -9,6 +9,7 @@ from busybar_tools import (
     run_cli_terminal,
     run_update_local,
     run_wait_for_device,
+    run_auto_install,
     run_install,
     run_fetch,
     run_write_recovery,
@@ -37,24 +38,25 @@ except Exception:
 
 TOP_EPILOG = """\
 examples:
-  busybar install                         install signed dev firmware on the device
-  busybar install -t 21 --unsigned 0.8.1  install a specific tag for hw target 21
-  busybar install --save-as-recovery dev  store the bundle into /bkp as recovery image
-  busybar fetch 0.8.1 -o ~/fw/            download a bundle into a local directory
-  busybar fetch dev --unpack -o ./out/    download and unpack a bundle locally
-  busybar install-onboard --recovery      install firmware already staged on the device
-  busybar cli -d 10.0.5.20                open a CLI terminal session to the device
+  busybar auto-install                     recommended: autodetect & install latest dev firmware
+  busybar auto-install 0.10.2              autodetect target/signing, install a specific tag
+  busybar install -t 21 --unsigned 0.10.2  low-level: install a specific tag for hw target 21
+  busybar write-recovery 0.10.2            store a bkp bundle into the recovery partition
+  busybar fetch 0.10.2 -o ~/fw/            download a bundle into a local directory
+  busybar install-onboard recovery         install firmware already on the device's recovery
+  busybar cli -d 10.0.5.20                 open a CLI terminal session to the device
   busybar storage -d 10.0.4.20 -- list /ext
 
-Options that affect a command are placed on that command (e.g. `busybar install -t 21 dev`).
+Most users want `busybar auto-install`. The other commands are explicit/low-level.
+Options that affect a command are placed on that command (e.g. `busybar install -t 21 0.10.2`).
 Use `busybar <command> --help` for command-specific options.
 """
 
 # `source` accepts (resolved in this priority order):
 SOURCE_HELP = (
-    "Firmware source. Accepted forms (priority order): "
+    "Firmware source (required). Accepted forms (priority order): "
     "explicit URL (http/https) | local bundle file | local directory | "
-    f"update-server tag/branch (default: {UPDATE_DEFAULT_BRANCH})."
+    "update-server tag/branch."
 )
 
 
@@ -80,7 +82,7 @@ def _make_no_wait_opts():
 def _make_firmware_opts():
     """Parent parser: which firmware to take. Shared by install and fetch."""
     p = argparse.ArgumentParser(add_help=False)
-    p.add_argument("source", help=SOURCE_HELP, type=str, default=UPDATE_DEFAULT_BRANCH, nargs="?")
+    p.add_argument("source", help=SOURCE_HELP, type=str)
 
     g = p.add_argument_group("firmware selection (update server only)")
     g.add_argument("-t", "--target", help=f"Target hardware version, default: {U5_TARGET_HW}", type=int, default=U5_TARGET_HW, choices=U5_TARGET_HW_OPTIONS)
@@ -117,6 +119,18 @@ def busybar_main():
     subparsers = parser.add_subparsers(
         dest="command", help="Commands to run", required=False
     )
+
+    # auto-install -----------------------------------------------------------
+    p_auto = subparsers.add_parser(
+        "auto-install",
+        parents=[device_opts],
+        help="Automatic install for regular users (autodetects target & signing)",
+        description="Read the device info, autodetect the hardware target and whether signed "
+                    "firmware is required, then fetch and install the matching update bundle and "
+                    "report the version change. The source must be an update-server tag/branch or URL.",
+    )
+    p_auto.add_argument("source", help=f"Update-server tag/branch or URL (default: {UPDATE_DEFAULT_BRANCH})", type=str, default=UPDATE_DEFAULT_BRANCH, nargs="?")
+    p_auto.set_defaults(func=run_auto_install)
 
     # install ----------------------------------------------------------------
     p_install = subparsers.add_parser(

@@ -33,37 +33,61 @@ Install in editable mode (for development): `pip install -e .` from the project 
     busybar <command> [options]
 
     commands:
-      install          Install firmware on the device
+      auto-install     Automatic install for regular users (autodetects target & signing)
+      install          Install firmware on the device (explicit, low-level)
       fetch            Download (and optionally unpack) a firmware bundle locally
       install-onboard  Install firmware already staged on the device
+      write-recovery   Write a firmware bundle into the recovery partition (no install)
       cli              CLI terminal session to the device
       wait             Wait for the device to be reachable
       storage          Run the embedded storage.py utility on the device
       clean            Clean the package's tmp/cache directory
 
+**Most users want [`busybar auto-install`](#busybar-auto-install)** — it detects everything and just
+works. `install` / `fetch` / `write-recovery` are explicit, low-level tools and **require an explicit
+`source`** (no `dev` default).
+
 Options are scoped to the command they affect, so they go **after** the command
-(e.g. `busybar install -t 21 dev`, not `busybar -t 21 install`).
+(e.g. `busybar install -t 21 0.10.2`, not `busybar -t 21 install`).
 Run `busybar <command> --help` for the full list of options for a command.
 
-Device-facing commands (`install`, `install-onboard`, `cli`, `wait`, `storage`) accept:
+Device-facing commands (`auto-install`, `install`, `install-onboard`, `cli`, `wait`, `storage`) accept:
 - `-d`, `--device DEVICE` — device IP address (USB LAN or Wi-Fi). `r`/`ref` selects the reference device.
 - `-p`, `--port PORT` — device TCP port (default: 23).
 - `--no-wait` — skip the device reachability (ping) check that normally runs before the operation
-  (available on every device-facing command except `wait`).
+  (available on every device-facing command except `wait` and `auto-install`).
+
+### `busybar auto-install`
+
+The recommended path for regular users. It connects to the device, reads its info, **autodetects the
+hardware target and whether signed firmware is required**, then fetches the matching regular update
+bundle and installs it — finally waiting for the reboot and reporting the version change.
+
+    busybar auto-install [-d DEVICE] [-p PORT] [source]
+
+- `source` — an update-server tag/branch or URL (default: `dev`). Local files/directories are **not**
+  accepted here, since the right bundle is chosen automatically from the server for the detected
+  target/signing — use `install` for a local source.
+- No firmware-selection flags (`-t`, `--signed`, `--bkp`, …): everything is autodetected. For manual
+  control use `install`.
+
+Examples:
+- `busybar auto-install` — install the latest `dev` firmware appropriate for the device.
+- `busybar auto-install 0.10.2` — install a specific tag, autodetecting target and signing.
+- `busybar auto-install -d 10.0.5.20` — target a device with a custom IP.
 
 ### `busybar install`
 
-    busybar install [--update | --bkp] [--signed | --unsigned]
-                    [--install | --save-as-recovery] [--via-storage | --via-http]
-                    [-t {20,21,22}] [-d DEVICE] [-p PORT] [source]
+    busybar install [--update | --bkp] [--signed | --unsigned] [--via-storage | --via-http]
+                    [--no-invoke-update] [-t {20,21,22}] [-d DEVICE] [-p PORT] source
 
 For bracketed pairs, **the first option is the default**.
 
-**`source`** — what firmware to install. Accepted forms, resolved in this priority order:
+**`source`** (required) — what firmware to install. Accepted forms, resolved in this priority order:
 1. an explicit URL (`http://` / `https://`) to a folder with build artifacts;
 2. a path to a local bundle file (`.tgz` / `.tar`);
 3. a path to a local directory (an already-unpacked bundle);
-4. otherwise a tag or branch on the update server (default: `dev`).
+4. otherwise a tag or branch on the update server.
 
 #### Firmware selection (update server only)
 
@@ -78,19 +102,12 @@ the source is a local file or directory.
 #### Delivery / transport
 
 - `--via-storage` | `--via-http` — how to deliver the bundle to the device. `--via-storage` (default)
-  uploads via the storage.py protocol and supports the on-device actions below. `--via-http` uses the
-  HTTP API and performs a **direct install only** (no action choice).
+  uploads via the storage.py protocol. `--via-http` uses the HTTP API and performs a **direct install only**.
+- `--no-invoke-update` — upload the bundle to the staging directory but do not invoke installation
+  (useful for staging; install it later with `busybar install-onboard`). Requires `--via-storage`.
 
-#### On-device action — only with `--via-storage`
-
-What to do with the bundle on the device. Available only with the default `--via-storage` transport.
-
-- `--install` (default) — upload the bundle to a temporary directory on the device, then install from it.
-- `--save-as-recovery` — only write the bundle into the recovery partition (`/bkp`), **without** installing
-  it. **DANGER**: an incorrect bundle here can brick the device. Normally combined with `--bkp`, since that
-  bundle type is purpose-built for the recovery partition; using it with `--update` is allowed but logs a warning.
-- `--confirm-timeout SECONDS` — countdown (default: 3) before overwriting the recovery partition with `--save-as-recovery`.
-- `--no-invoke-update` — upload the bundle but do not invoke installation (useful for staging).
+> To write a bundle into the recovery partition (without installing it), use
+> [`busybar write-recovery`](#busybar-write-recovery) instead.
 
 #### Examples
 
@@ -100,7 +117,6 @@ What to do with the bundle on the device. Available only with the default `--via
 - `busybar install -t 21 0.10.2` — install for hardware target 21.
 - `busybar install ./busybar-f22-update_signed-dev-18062026-74507667.tgz` — install from a local bundle file.
 - `busybar install -d 10.0.5.20 vanyww/some-branch-name --unsigned` — install an unsigned bundle from a branch onto a device with a custom IP.
-- `busybar install --bkp --save-as-recovery 0.10.2` — write a signed bundle to the recovery partition. **DANGEROUS**, not recommended for regular users.
 - `busybar install https://update.flipperzero.one/builds/busybar-firmware/0.10.2/` — install from a direct URL.
 
 ### `busybar fetch`
@@ -109,7 +125,7 @@ Download (and optionally unpack) a firmware bundle **locally, without touching t
 Accepts the same `source` and firmware-selection options as `install` (`-t`, `--update/--bkp`, `--signed/--unsigned`).
 
     busybar fetch [--update | --bkp] [--signed | --unsigned] [-t {20,21,22}]
-                  [--unpack] [-o OUTPUT] [source]
+                  [--unpack] [-o OUTPUT] source
 
 - `--unpack` — also unpack the downloaded bundle.
 - `-o`, `--output DEST` — destination directory or file path. If omitted, the result stays in the package
@@ -135,6 +151,28 @@ Examples:
 - `busybar install-onboard` — install from the staged update directory.
 - `busybar install-onboard recovery` — install from the recovery partition.
 - `busybar install-onboard /ext/tmp/update` — install from a specific on-device path.
+
+### `busybar write-recovery`
+
+Acquire a firmware bundle (same `source` and firmware-selection options as `install`) and write it into
+the device recovery partition (`/bkp`), **without installing it**. This is the bundle that gets applied on a
+factory reset. **DANGER**: an incorrect bundle here can brick the device — not recommended for regular users.
+
+    busybar write-recovery [--bkp | --update] [--signed | --unsigned] [-t {20,21,22}]
+                           [-d DEVICE] [-p PORT] [--no-wait] [--confirm-timeout SECONDS] source
+
+- Defaults to the `--bkp` bundle type (purpose-built for the recovery partition). Using `--update` is
+  allowed but logs a warning.
+- `--confirm-timeout SECONDS` — countdown (default: 3) before overwriting the recovery partition.
+- Always uses the storage transport (there is no `--via-http` here).
+
+Examples:
+- `busybar write-recovery` — write the signed `bkp` `dev` bundle into recovery.
+- `busybar write-recovery 0.10.2` — write a specific tag's bundle into recovery.
+- `busybar write-recovery -d 10.0.5.20 factory` — write onto a device with a custom IP.
+- `busybar write-recovery ./bundle.tgz` — write a local bundle into recovery.
+
+To install *from* the recovery partition afterwards, use `busybar install-onboard recovery`.
 
 ### `busybar cli`
 
@@ -166,6 +204,11 @@ Available storage sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`,
 - ...create an [issue](https://github.com/lomalkin/busybar-tools/issues) for any feature requests or bug reports!
 
 ## Unreleased
+- New `busybar auto-install` command — the recommended path for regular users: it reads the device
+  info, autodetects the hardware target and whether signed firmware is required, fetches the matching
+  update bundle, installs it, and reports the version change. Accepts only an update-server tag/branch/URL.
+- `install` / `fetch` / `write-recovery` now **require an explicit `source`** (the `dev` default was
+  removed; it now lives in `auto-install`).
 - CLI restructure for clarity and consistency (**breaking change**):
     - Options are now scoped to the command they affect and go **after** the command
       (e.g. `busybar install -t 21 dev` instead of `busybar -t 21 install`). `-d`/`-p`/`-t` are no longer global.
@@ -173,11 +216,13 @@ Available storage sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`,
       command (with `--unpack` and `-o/--output` to choose where to place the result).
     - `busybar update` is renamed to `busybar install-onboard` (install firmware already staged on the device);
       the recovery partition is now selected with the `recovery` positional keyword instead of a `--recovery` flag.
+    - Writing a bundle into the recovery partition is now a dedicated `busybar write-recovery` command
+      (defaults to `--bkp`); the `install --save-as-recovery` / `--install` / `--confirm-timeout` options are removed.
     - `--recovery-timeout` is renamed to `--confirm-timeout`.
-    - Invalid combinations now fail with a clear error (e.g. `--via-http` with `--save-as-recovery` / `--no-invoke-update`).
+    - Invalid combinations now fail with a clear error (e.g. `--via-http` with `--no-invoke-update`).
     - `busybar storage` now selects the device consistently via `-d`/`-p` (pass storage sub-commands after `--`).
     - Added `--no-wait` to skip the device reachability (ping) check on device-facing commands (except `wait`).
-    - `--save-as-recovery` now logs a warning when used without `--bkp` (the intended bundle type for recovery).
+    - `write-recovery` logs a warning when used with `--update` instead of `--bkp` (the intended bundle type for recovery).
 
 ## 0.7.0
 - Windows support (cli, install, storage)
