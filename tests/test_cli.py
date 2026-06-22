@@ -39,6 +39,37 @@ def test_install_accepts_arbitrary_target(monkeypatch):
     assert captured["target"] == 23
 
 
+def _capture_bundle(monkeypatch, argv):
+    """Parse `argv`, returning the resolved update_bundle_type (run_* mocked out)."""
+    captured = {}
+
+    def f(args):
+        captured["bundle"] = args.update_bundle_type
+        return 0
+
+    monkeypatch.setattr(cli, "run_install", f)
+    monkeypatch.setattr(cli, "run_fetch", f)
+    monkeypatch.setattr(cli, "run_write_recovery", f)
+    run_cli(monkeypatch, argv)
+    return captured["bundle"]
+
+
+@pytest.mark.parametrize("cmd,expected", [
+    ("install", "update"),
+    ("fetch", "update"),
+    ("write-recovery", "bkp"),
+])
+def test_default_bundle_type_per_command(monkeypatch, cmd, expected):
+    # Regression: a shared firmware_opts parent let write-recovery's --bkp default
+    # leak into install/fetch via mutated argparse action defaults.
+    assert _capture_bundle(monkeypatch, [cmd, "dev"]) == expected
+
+
+def test_bundle_type_overrides(monkeypatch):
+    assert _capture_bundle(monkeypatch, ["install", "--bkp", "dev"]) == "bkp"
+    assert _capture_bundle(monkeypatch, ["write-recovery", "--update", "dev"]) == "update"
+
+
 def test_install_signed_and_unsigned_are_mutually_exclusive(monkeypatch):
     with pytest.raises(SystemExit):
         run_cli(monkeypatch, ["install", "--signed", "--unsigned", "dev"])

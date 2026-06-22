@@ -103,8 +103,10 @@ def busybar_main():
     logging.debug(f"cwd: {os.getcwd()}")
 
     device_opts = _make_device_opts()
-    firmware_opts = _make_firmware_opts()
     no_wait_opts = _make_no_wait_opts()
+    # NOTE: firmware_opts must be a FRESH instance per command. argparse `parents=`
+    # shares the same action objects, and set_defaults() mutates action.default on them —
+    # so a shared firmware_opts would let write-recovery's --bkp default leak into install/fetch.
 
     parser = argparse.ArgumentParser(
         prog="busybar",
@@ -133,7 +135,7 @@ def busybar_main():
     # install ----------------------------------------------------------------
     p_install = subparsers.add_parser(
         "install",
-        parents=[firmware_opts, device_opts, no_wait_opts],
+        parents=[_make_firmware_opts(), device_opts, no_wait_opts],
         help="Install firmware on the device",
         description="Resolve a firmware source, deliver it to the device and install it.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -152,7 +154,7 @@ def busybar_main():
     # write-recovery ---------------------------------------------------------
     p_write_recovery = subparsers.add_parser(
         "write-recovery",
-        parents=[firmware_opts, device_opts, no_wait_opts],
+        parents=[_make_firmware_opts(), device_opts, no_wait_opts],
         help="Write a firmware bundle into the device recovery partition (without installing)",
         description="Resolve a firmware source and store it into the recovery partition (/bkp), "
                     "WITHOUT installing it. Defaults to the --bkp bundle type (purpose-built for "
@@ -165,7 +167,7 @@ def busybar_main():
     # fetch ------------------------------------------------------------------
     p_fetch = subparsers.add_parser(
         "fetch",
-        parents=[firmware_opts],
+        parents=[_make_firmware_opts()],
         help="Download (and optionally unpack) a firmware bundle locally",
         description="Fetch a firmware bundle without touching the device.",
     )
