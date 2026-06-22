@@ -386,17 +386,32 @@ def run_install(args, verbose=False):
 
 def _install_from_dir(args, source_dir):
     invoke_update = args.invoke_update
-    if args.save_as_recovery == True:
-        logging.warning("Saving unpacked bundle as recovery bundle on device /bkp! This can be dangerous if the bundle is not correct!")
-        invoke_update = False
-
     if invoke_update == False:
         logging.warning("Will NOT invoke update after uploading the bundle on device!")
 
-    bsb_update_dst_dir = busybar_storage_upload_auto(args, source_dir, save_as_recovery=args.save_as_recovery, warning_timeout=args.recovery_timeout)
+    bsb_update_dst_dir = busybar_storage_upload_auto(args, source_dir)
 
     if invoke_update:
         return run_update_from_storage(args, bsb_update_dst_dir)
+    return 0
+
+
+def run_write_recovery(args):
+    """Write a firmware bundle into the device recovery partition (/bkp), without installing it.
+
+    Reuses the shared acquisition stages (resolve_source + unpack_bundle) and uploads to the
+    recovery partition via storage. Installation is never invoked.
+    """
+    args.save_as_recovery = True  # also drives the "--bkp recommended" warning in resolve_source
+    source_file, source_dir = resolve_source(args)
+    if source_file is not None:
+        source_dir = unpack_bundle(source_file)
+
+    if not source_dir:
+        logging.error("Could not obtain a bundle directory to write to recovery.")
+        return 1
+
+    busybar_storage_upload_auto(args, source_dir, save_as_recovery=True, warning_timeout=args.recovery_timeout)
     return 0
 
 
@@ -409,6 +424,8 @@ def run_fetch(args):
     The final path is printed to stdout.
     """
     source_file, source_dir = resolve_source(args)
+
+    # TODO not working as intended actually
 
     if getattr(args, "unpack", False):
         # A directory source is already unpacked; otherwise unpack the bundle file.

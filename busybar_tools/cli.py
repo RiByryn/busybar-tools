@@ -5,27 +5,24 @@ import logging
 from importlib.metadata import version
 
 from busybar_tools import (
-    run_update_from_storage,
-    run_update_from_recovery,
     run_clean,
     run_cli_terminal,
     run_update_local,
     run_wait_for_device,
     run_install,
     run_fetch,
+    run_write_recovery,
     run_storage,
 )
 
 from busybar_tools.helpers import (
     setup_logging,
-    print_pretty,
 )
 
 from busybar_tools.config import (
     DEVICE_IP,
     DEVICE_IP_REF,
     DEVICE_PORT,
-    DIR_BSB_RECOVERY,
     U5_TARGET_HW,
     U5_TARGET_HW_OPTIONS,
     UPDATE_DEFAULT_BRANCH
@@ -136,19 +133,22 @@ def busybar_main():
     transport_mx.add_argument("--via-storage", dest="via_storage", action="store_true", help="Deliver via storage.py protocol (default)")
     transport_mx.add_argument("--via-http", dest="via_storage", action="store_false", help="Deliver via HTTP API (direct install only)")
 
-    # Action: install (default) vs save-as-recovery. Storage transport only.
-    action_group = p_install.add_argument_group(
-        "on-device action",
-        "What to do with the bundle on the device. Requires --via-storage (the default); "
-        "not available with --via-http.",
-    )
-    action_mx = action_group.add_mutually_exclusive_group()
-    action_mx.add_argument("--install", dest="install", action="store_true", help="Upload the bundle to a temp dir on the device, then install from it (default)")
-    action_mx.add_argument("--save-as-recovery", dest="save_as_recovery", action="store_true", help="Only store the bundle into the recovery partition (/bkp), do NOT install it. DANGER!")
-    action_group.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Upload the bundle but do not invoke installation (use with --via-storage)")
-    action_group.add_argument("--confirm-timeout", dest="recovery_timeout", metavar="SECONDS", type=int, default=3, help="Countdown (seconds) before overwriting the recovery partition with --save-as-recovery")
+    p_install.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Upload the bundle to the staging dir but do not invoke installation (--via-storage only)")
 
     p_install.set_defaults(func=run_install, via_storage=True)
+
+    # write-recovery ---------------------------------------------------------
+    p_write_recovery = subparsers.add_parser(
+        "write-recovery",
+        parents=[firmware_opts, device_opts, no_wait_opts],
+        help="Write a firmware bundle into the device recovery partition (without installing)",
+        description="Resolve a firmware source and store it into the recovery partition (/bkp), "
+                    "WITHOUT installing it. Defaults to the --bkp bundle type (purpose-built for "
+                    "recovery). DANGER: an incorrect bundle here can brick the device.",
+    )
+    p_write_recovery.add_argument("--confirm-timeout", dest="recovery_timeout", metavar="SECONDS", type=int, default=3, help="Countdown (seconds) before overwriting the recovery partition")
+    # The recovery partition expects a bkp-type bundle, so default to --bkp here.
+    p_write_recovery.set_defaults(func=run_write_recovery, update_bundle_type="bkp")
 
     # fetch ------------------------------------------------------------------
     p_fetch = subparsers.add_parser(
@@ -201,12 +201,9 @@ def busybar_main():
     if hasattr(args, "device") and args.device.lower() in ["r", "ref"]:
         args.device = DEVICE_IP_REF
 
-    # --via-http is a direct-install transport: it has no on-device action choice.
-    if args.command == "install" and not args.via_storage:
-        if args.save_as_recovery:
-            p_install.error("--save-as-recovery requires --via-storage (not available with --via-http)")
-        if not args.invoke_update:
-            p_install.error("--no-invoke-update requires --via-storage (not available with --via-http)")
+    # --via-http is a direct-install transport: it cannot stage without installing.
+    if args.command == "install" and not args.via_storage and not args.invoke_update:
+        p_install.error("--no-invoke-update requires --via-storage (not available with --via-http)")
 
     args.verbose = True
 
