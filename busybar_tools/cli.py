@@ -142,59 +142,6 @@ def busybar_main():
     p_auto.add_argument("source", help=f"Update-server tag/branch or URL (default: {UPDATE_DEFAULT_BRANCH})", type=str, default=UPDATE_DEFAULT_BRANCH, nargs="?")
     p_auto.set_defaults(func=run_auto_install)
 
-    # install ----------------------------------------------------------------
-    p_install = subparsers.add_parser(
-        "install",
-        parents=[_make_firmware_opts(), device_opts, no_wait_opts],
-        help="Install firmware on the device",
-        description="Resolve a firmware source, deliver it to the device and install it.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-
-    # Transport: storage (default) vs http.
-    transport_group = p_install.add_argument_group("delivery / transport")
-    transport_mx = transport_group.add_mutually_exclusive_group()
-    transport_mx.add_argument("--via-storage", dest="via_storage", action="store_true", help="Deliver via storage.py protocol (default)")
-    transport_mx.add_argument("--via-http", dest="via_storage", action="store_false", help="Deliver via HTTP API (direct install only)")
-
-    p_install.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Upload the bundle to the staging dir but do not invoke installation (--via-storage only)")
-
-    p_install.set_defaults(func=run_install, via_storage=True)
-
-    # write-recovery ---------------------------------------------------------
-    p_write_recovery = subparsers.add_parser(
-        "write-recovery",
-        parents=[_make_firmware_opts(), device_opts, no_wait_opts],
-        help="Write a firmware bundle into the device recovery partition (without installing)",
-        description="Resolve a firmware source and store it into the recovery partition (/bkp), "
-                    "WITHOUT installing it. Defaults to the --bkp bundle type (purpose-built for "
-                    "recovery). DANGER: an incorrect bundle here can brick the device.",
-    )
-    p_write_recovery.add_argument("--confirm-timeout", dest="recovery_timeout", metavar="SECONDS", type=int, default=3, help="Countdown (seconds) before overwriting the recovery partition")
-    # The recovery partition expects a bkp-type bundle, so default to --bkp here.
-    p_write_recovery.set_defaults(func=run_write_recovery, update_bundle_type="bkp")
-
-    # fetch ------------------------------------------------------------------
-    p_fetch = subparsers.add_parser(
-        "fetch",
-        parents=[_make_firmware_opts()],
-        help="Download (and optionally unpack) a firmware bundle locally",
-        description="Fetch a firmware bundle without touching the device.",
-    )
-    p_fetch.add_argument("--unpack", dest="unpack", action="store_true", help="Also unpack the downloaded bundle")
-    p_fetch.add_argument("-o", "--output", dest="output", type=str, default=None, help="Destination directory or file path; if omitted, the package cache is used")
-    p_fetch.set_defaults(func=run_fetch)
-
-    # install-onboard --------------------------------------------------------
-    p_onboard = subparsers.add_parser(
-        "install-onboard",
-        parents=[device_opts, no_wait_opts],
-        help="Install firmware already staged on the device",
-        description="Invoke installation from a bundle already present on the device storage.",
-    )
-    p_onboard.add_argument("device_path", help="Path on the device to install from, or the literal 'recovery' for the recovery partition (default: the staged update dir)", type=str, default="", nargs="?")
-    p_onboard.set_defaults(func=run_update_local)
-
     # cli --------------------------------------------------------------------
     p_run_cli = subparsers.add_parser(
         "cli", parents=[device_opts, no_wait_opts],
@@ -212,6 +159,66 @@ def busybar_main():
     p_run_cli.add_argument("cli_args", nargs=argparse.REMAINDER, help="Command to run, after `--` (e.g. -- sysctl debug 1)")
     p_run_cli.set_defaults(func=run_cli_terminal)
 
+    # storage ----------------------------------------------------------------
+    p_storage = subparsers.add_parser(
+        "storage", parents=[device_opts, no_wait_opts], help="Run the embedded storage.py utility on the device"
+    )
+    p_storage.add_argument("storage_args", nargs=argparse.REMAINDER, help="Sub-command and arguments passed to storage.py (e.g. -- list /ext)")
+    p_storage.set_defaults(func=run_storage)
+
+    # install ----------------------------------------------------------------
+    p_install = subparsers.add_parser(
+        "install",
+        parents=[_make_firmware_opts(), device_opts, no_wait_opts],
+        help="Install firmware on the device",
+        description="Resolve a firmware source, deliver it to the device and install it.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    p_install.add_argument("--no-invoke-update", dest="invoke_update", action="store_false", help="Upload the bundle to the staging dir but do not invoke installation (--via-storage only)")
+
+    p_install.set_defaults(func=run_install, via_storage=True)
+
+    # Transport: storage (default) vs http.
+    transport_group = p_install.add_argument_group("delivery / transport")
+    transport_mx = transport_group.add_mutually_exclusive_group()
+    transport_mx.add_argument("--via-storage", dest="via_storage", action="store_true", help="Deliver via storage.py protocol (default)")
+    transport_mx.add_argument("--via-http", dest="via_storage", action="store_false", help="Deliver via HTTP API (direct install only)")
+
+    # fetch ------------------------------------------------------------------
+    p_fetch = subparsers.add_parser(
+        "fetch",
+        parents=[_make_firmware_opts()],
+        help="Download (and optionally unpack) a firmware bundle locally",
+        description="Fetch a firmware bundle without touching the device.",
+    )
+    p_fetch.add_argument("--unpack", dest="unpack", action="store_true", help="Also unpack the downloaded bundle")
+    p_fetch.add_argument("-o", "--output", dest="output", type=str, default=None, help="Destination directory or file path; if omitted, the package cache is used")
+    p_fetch.set_defaults(func=run_fetch)
+
+    # write-recovery ---------------------------------------------------------
+    p_write_recovery = subparsers.add_parser(
+        "write-recovery",
+        parents=[_make_firmware_opts(), device_opts, no_wait_opts],
+        help="Write a firmware bundle into the device recovery partition (without installing)",
+        description="Resolve a firmware source and store it into the recovery partition (/bkp), "
+                    "WITHOUT installing it. Defaults to the --bkp bundle type (purpose-built for "
+                    "recovery). DANGER: an incorrect bundle here can brick the device.",
+    )
+    p_write_recovery.add_argument("--confirm-timeout", dest="recovery_timeout", metavar="SECONDS", type=int, default=3, help="Countdown (seconds) before overwriting the recovery partition")
+    # The recovery partition expects a bkp-type bundle, so default to --bkp here.
+    p_write_recovery.set_defaults(func=run_write_recovery, update_bundle_type="bkp")
+
+    # install-onboard --------------------------------------------------------
+    p_onboard = subparsers.add_parser(
+        "install-onboard",
+        parents=[device_opts, no_wait_opts],
+        help="Install firmware already staged on the device",
+        description="Invoke installation from a bundle already present on the device storage.",
+    )
+    p_onboard.add_argument("device_path", help="Path on the device to install from, or the literal 'recovery' for the recovery partition (default: the staged update dir)", type=str, default="", nargs="?")
+    p_onboard.set_defaults(func=run_update_local)
+
     # wait -------------------------------------------------------------------
     p_run_wait = subparsers.add_parser(
         "wait", parents=[device_opts], help="Wait for the device to be reachable via ping, nothing else"
@@ -224,12 +231,6 @@ def busybar_main():
     )
     p_clean.set_defaults(func=run_clean)
 
-    # storage ----------------------------------------------------------------
-    p_storage = subparsers.add_parser(
-        "storage", parents=[device_opts, no_wait_opts], help="Run the embedded storage.py utility on the device"
-    )
-    p_storage.add_argument("storage_args", nargs=argparse.REMAINDER, help="Sub-command and arguments passed to storage.py (e.g. -- list /ext)")
-    p_storage.set_defaults(func=run_storage)
 
     args = parser.parse_args()
 
