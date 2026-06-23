@@ -598,6 +598,15 @@ def run_fetch(args):
         action = "Fetched and unpacked" if getattr(args, "unpack", False) else "Fetched"
         logging.info(f"{action} '{args.source}' to: {result}")
     print(result)
+
+    if getattr(args, "unpack", False):
+        logging.info(f"Contents of unpacked bundle '{result}':")
+        for root, dirs, files in os.walk(result):
+            for name in files:
+                file_path = os.path.join(root, name)
+                rel_path = os.path.relpath(file_path, result)
+                size = os.path.getsize(file_path)
+                print(f"\t{rel_path} ({size} bytes)")
     return 0
 
 def run_update_via_http(args):

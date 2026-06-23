@@ -34,6 +34,8 @@ def test_local_dir_source_with_unpack_returns_dir(tmp_path, capsys):
     d.mkdir()
     (d / "f").write_text("y")
     ret = bt.run_fetch(_args(source=str(d), unpack=True))
-    out = capsys.readouterr().out.strip()
+    lines = capsys.readouterr().out.strip().splitlines()
     assert ret == 0
-    assert out == str(d)
+    # First line is the result path; --unpack then lists the unpacked contents.
+    assert lines[0] == str(d)
+    assert any("f (1 bytes)" in ln for ln in lines[1:])
