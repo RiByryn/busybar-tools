@@ -14,18 +14,31 @@ Available as a Python package on [PyPI](https://pypi.org/project/busybar-tools/)
 
 ## Installation and Upgrade
 
-    sudo apt install pipx       # Ubuntu/Debian
-    brew install pipx           # MacOS (Homebrew, https://brew.sh/)
-    scoop install pipx          # Windows (Scoop, https://scoop.sh/)
+The tool is installed with [pipx](https://pipx.pypa.io/). Pick your OS:
 
-    pipx ensurepath             # Optional step to ensure pipx binaries are in PATH, for all OS.
-    # If you haven't install `pipx` before, you will NEED to open a new terminal before continuing.
+**Linux (Ubuntu/Debian)**
 
+    sudo apt install pipx
+    pipx ensurepath
     pipx install busybar-tools
 
-    pipx upgrade busybar-tools  # To upgrade to the latest available version if you have it installed already.
+**macOS** (Homebrew)
 
-Install in editable mode (for development): `pip install -e .` from the project root directory. It is recommended to use a virtual environment for that.
+    brew install pipx
+    pipx ensurepath
+    pipx install busybar-tools
+
+**Windows** (Scoop)
+
+    scoop install pipx
+    pipx ensurepath
+    pipx install busybar-tools
+
+After the first `pipx ensurepath` you may need to open a new terminal.
+
+**Upgrade** (any OS): `pipx upgrade busybar-tools`
+
+**Development**: `pip install -e .` from the project root (use a virtual environment).
 
 
 ## Usage
@@ -33,177 +46,117 @@ Install in editable mode (for development): `pip install -e .` from the project 
     busybar <command> [options]
 
     commands:
-      auto-install     Automatic install for regular users (autodetects target & signing)
-      install          Install firmware on the device (explicit, low-level)
-      fetch            Download (and optionally unpack) a firmware bundle locally
-      install-onboard  Install firmware already staged on the device
-      write-recovery   Write a firmware bundle into the recovery partition (no install)
-      cli              CLI terminal session to the device
-      wait             Wait for the device to be reachable
+      auto-install     Autodetect target & signing, then install — recommended for most users
+      cli              CLI terminal session, or run commands non-interactively
       storage          Run the embedded storage.py utility on the device
+      install          Install firmware from an explicit source (low-level)
+      fetch            Download (and optionally unpack) a firmware bundle locally
+      write-recovery   Write a firmware bundle into the recovery partition (no install)
+      install-onboard  Install firmware already staged on the device
+      wait             Wait for the device to be reachable
       clean            Clean the package's tmp/cache directory
 
-**Most users want [`busybar auto-install`](#busybar-auto-install)** — it detects everything and just
-works. `install` / `fetch` / `write-recovery` are explicit, low-level tools and **require an explicit
-`source`** (no `dev` default).
+**Most users want [`busybar auto-install`](#busybar-auto-install).** The firmware commands
+`install` / `fetch` / `write-recovery` are explicit/low-level and **require an explicit `source`**.
 
-Options are scoped to the command they affect, so they go **after** the command
-(e.g. `busybar install -t 21 0.10.2`, not `busybar -t 21 install`).
-Run `busybar <command> --help` for the full list of options for a command.
+Options go **after** the command (e.g. `busybar install -t 21 0.10.2`). Run `busybar <command> --help`
+for the full list.
 
-Device-facing commands (`auto-install`, `install`, `install-onboard`, `cli`, `wait`, `storage`) accept:
-- `-d`, `--device DEVICE` — device IP address (USB LAN or Wi-Fi). `r`/`ref` selects the reference device.
-- `-p`, `--port PORT` — device TCP port (default: 23).
-- `--no-wait` — skip the device reachability (ping) check that normally runs before the operation
-  (available on every device-facing command except `wait`).
+Device commands (`auto-install`, `cli`, `storage`, `install`, `write-recovery`, `install-onboard`,
+`wait`) accept `-d/--device` (IP; `r`/`ref` = reference device) and `-p/--port` (default 23). All of
+them except `wait` also accept `--no-wait` to skip the pre-operation reachability check.
 
 ### `busybar auto-install`
 
-The recommended path for regular users. It connects to the device, reads its info, **autodetects the
-hardware target and whether signed firmware is required**, then fetches the matching regular update
-bundle and installs it — finally waiting for the reboot and reporting the version change.
+Autodetects the hardware target and whether signed firmware is required, fetches the matching update
+bundle, installs it, then waits for the reboot and reports the version change.
 
     busybar auto-install [--via-storage | --via-http] [--no-wait] [--no-wait-after]
                          [-d DEVICE] [-p PORT] [source]
 
-- `source` — an update-server tag/branch or URL (default: `dev`). Local files/directories are **not**
-  accepted here, since the right bundle is chosen automatically from the server for the detected
-  target/signing — use `install` for a local source.
-- No firmware-selection flags (`-t`, `--signed`, `--bkp`, …): target and signing are autodetected
-  from the device. For manual control use `install`.
-- `--via-storage` | `--via-http` — delivery transport (default `--via-storage`), same as `install`.
-- `--no-wait` — skip the reachability check **before** reading the device.
-- `--no-wait-after` — skip waiting for the device to reboot and come back **after** install (by
-  default it waits and reports the version change; with this flag it returns right after install).
+- `source` — update-server tag/branch or URL (default: `dev`). Local files/dirs are not accepted here
+  (the bundle is chosen automatically for the detected target/signing — use `install` for those).
+- `--no-wait-after` — return right after install instead of waiting for the reboot / version check.
 
 Examples:
-- `busybar auto-install` — install the latest `dev` firmware appropriate for the device.
-- `busybar auto-install 0.10.2` — install a specific tag, autodetecting target and signing.
-- `busybar auto-install -d 10.0.5.20` — target a device with a custom IP.
-- `busybar auto-install --via-http --no-wait-after dev` — install over HTTP, don't wait for the reboot.
+- `busybar auto-install` — install the latest `dev` firmware for this device.
+- `busybar auto-install 0.10.2` — install a specific tag.
+
+### `busybar cli`
+
+Interactive session, or run commands non-interactively.
+
+    busybar cli [-i] [--timeout SECONDS] [-d DEVICE] [-p PORT] [-- COMMAND ...]
+
+- `busybar cli` — interactive session (`Ctrl+]` to exit).
+- `busybar cli -- device_info` — run one command and exit.
+- `busybar cli -i -- device_info` — run the command, then stay in the session (same connection).
+- `echo device_info | busybar cli` — run commands from stdin (one per line) and exit.
+
+### `busybar storage`
+
+Run the embedded storage.py tool on the device; pass its sub-command after `--`.
+
+- `busybar storage -- list /ext`
+- `busybar storage -- send ./local.bin /ext/local.bin`
+
+Sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`, `receive`, `send`, `list`.
 
 ### `busybar install`
 
     busybar install [--update | --bkp] [--signed | --unsigned] [--via-storage | --via-http]
                     [--no-invoke-update] [-t TARGET] [-d DEVICE] [-p PORT] source
 
-For bracketed pairs, **the first option is the default**.
+For bracketed pairs the first option is the default. `source` (required) is resolved in priority order:
+URL (`http`/`https`) → local bundle file → local directory → update-server tag/branch.
 
-**`source`** (required) — what firmware to install. Accepted forms, resolved in this priority order:
-1. an explicit URL (`http://` / `https://`) to a folder with build artifacts;
-2. a path to a local bundle file (`.tgz` / `.tar`);
-3. a path to a local directory (an already-unpacked bundle);
-4. otherwise a tag or branch on the update server.
+- `-t`, `--target TARGET` — hardware target (default: 22; any integer that exists on the server).
+- `--update` | `--bkp` — bundle type (regular firmware vs recovery bundle).
+- `--signed` | `--unsigned` — bundle signature (production devices require signed).
+- `--via-storage` | `--via-http` — transport; `--via-http` is direct-install only.
+- `--no-invoke-update` — upload to the staging dir without installing (`--via-storage` only).
 
-#### Firmware selection (update server only)
-
-These options choose **which bundle to take from the update server**; they are ignored when
-the source is a local file or directory.
-
-- `-t`, `--target TARGET` — target hardware version (default: `22`; all production devices are at least `22`). Any integer is accepted; it must exist on the update server.
-- `--update` | `--bkp` — bundle type. `--update` (default) is the regular user firmware; `--bkp`
-  is a recovery bundle (with welcome animations). A `--bkp` bundle can also be installed as regular firmware.
-- `--signed` | `--unsigned` — bundle signature. Signed is the default; production devices must use only signed bundles.
-
-#### Delivery / transport
-
-- `--via-storage` | `--via-http` — how to deliver the bundle to the device. `--via-storage` (default)
-  uploads via the storage.py protocol. `--via-http` uses the HTTP API and performs a **direct install only**.
-- `--no-invoke-update` — upload the bundle to the staging directory but do not invoke installation
-  (useful for staging; install it later with `busybar install-onboard`). Requires `--via-storage`.
-
-> To write a bundle into the recovery partition (without installing it), use
-> [`busybar write-recovery`](#busybar-write-recovery) instead.
-
-#### Examples
-
-- `busybar install` — install the latest signed firmware from the `dev` branch.
-- `busybar install --unsigned dev` — install an unsigned bundle from a branch (custom builds; not for production).
-- `busybar install --unsigned 0.10.2` — install a specific tag/release.
+Examples:
+- `busybar install dev` — install signed firmware from the `dev` branch.
+- `busybar install --unsigned 0.10.2` — install a specific unsigned tag/release.
 - `busybar install -t 21 0.10.2` — install for hardware target 21.
-- `busybar install ./busybar-f22-update_signed-dev-18062026-74507667.tgz` — install from a local bundle file.
-- `busybar install -d 10.0.5.20 vanyww/some-branch-name --unsigned` — install an unsigned bundle from a branch onto a device with a custom IP.
-- `busybar install https://update.flipperzero.one/builds/busybar-firmware/0.10.2/` — install from a direct URL.
+- `busybar install ./bundle.tgz` — install from a local bundle file.
 
 ### `busybar fetch`
 
-Download (and optionally unpack) a firmware bundle **locally, without touching the device**.
-Accepts the same `source` and firmware-selection options as `install` (`-t`, `--update/--bkp`, `--signed/--unsigned`).
+Download (and optionally unpack) a firmware bundle locally, without touching the device. Same `source`
+and firmware-selection options as `install`.
 
-    busybar fetch [--update | --bkp] [--signed | --unsigned] [-t TARGET]
-                  [--unpack] [-o OUTPUT] source
+    busybar fetch [--update | --bkp] [--signed | --unsigned] [-t TARGET] [--unpack] [-o OUTPUT] source
 
 - `--unpack` — also unpack the downloaded bundle.
-- `-o`, `--output DEST` — destination directory or file path. If omitted, the result stays in the package
-  cache. The final path is printed to stdout.
+- `-o`, `--output DEST` — destination dir or file path (default: package cache). The final path is printed.
 
 Examples:
-- `busybar fetch dev` — download the bundle into the cache and print its path.
-- `busybar fetch 0.10.2 -o ~/fw/` — download the bundle into a directory.
-- `busybar fetch dev -o ./my-bundle.tgz` — download the bundle to a specific file name.
-- `busybar fetch dev --unpack -o ./out/` — download and unpack into a directory.
-
-### `busybar install-onboard`
-
-Install firmware that is **already staged on the device** (no download/upload), by invoking installation
-from an on-device path.
-
-    busybar install-onboard [-d DEVICE] [-p PORT] [device_path]
-
-- `device_path` — path on the device to install from (default: the staged update directory),
-  or the literal `recovery` to install from the recovery partition (`/bkp/recovery`).
-
-Examples:
-- `busybar install-onboard` — install from the staged update directory.
-- `busybar install-onboard recovery` — install from the recovery partition.
-- `busybar install-onboard /ext/tmp/update` — install from a specific on-device path.
+- `busybar fetch 0.10.2 -o ~/fw/` — download into a directory.
+- `busybar fetch dev --unpack -o ./out/` — download and unpack.
 
 ### `busybar write-recovery`
 
-Acquire a firmware bundle (same `source` and firmware-selection options as `install`) and write it into
-the device recovery partition (`/bkp`), **without installing it**. This is the bundle that gets applied on a
-factory reset. **DANGER**: an incorrect bundle here can brick the device — not recommended for regular users.
+Write a firmware bundle into the recovery partition (`/bkp`) **without** installing it (the image used
+on factory reset). **DANGER**: a wrong bundle can brick the device.
 
     busybar write-recovery [--bkp | --update] [--signed | --unsigned] [-t TARGET]
                            [-d DEVICE] [-p PORT] [--no-wait] [--confirm-timeout SECONDS] source
 
-- Defaults to the `--bkp` bundle type (purpose-built for the recovery partition). Using `--update` is
-  allowed but logs a warning.
-- `--confirm-timeout SECONDS` — countdown (default: 3) before overwriting the recovery partition.
-- Always uses the storage transport (there is no `--via-http` here).
+- Defaults to `--bkp` (`--update` is allowed but warns). Storage transport only.
+- `--confirm-timeout SECONDS` — countdown before overwriting the partition (default: 3).
 
-Examples:
-- `busybar write-recovery` — write the signed `bkp` `dev` bundle into recovery.
-- `busybar write-recovery 0.10.2` — write a specific tag's bundle into recovery.
-- `busybar write-recovery -d 10.0.5.20 factory` — write onto a device with a custom IP.
-- `busybar write-recovery ./bundle.tgz` — write a local bundle into recovery.
+Install *from* recovery afterwards with `busybar install-onboard recovery`.
 
-To install *from* the recovery partition afterwards, use `busybar install-onboard recovery`.
+### `busybar install-onboard`
 
-### `busybar cli`
+Install firmware already staged on the device (no download/upload).
 
-A terminal session to the device, or non-interactive command execution.
+    busybar install-onboard [-d DEVICE] [-p PORT] [device_path]
 
-    busybar cli [-i] [--timeout SECONDS] [-d DEVICE] [-p PORT] [-- COMMAND ...]
-
-- `busybar cli` — interactive session. Press `Ctrl+]` to exit.
-- `busybar cli -d 10.0.5.20 -p 23` — connect to a custom IP address and port.
-- `busybar cli -- device_info` — run a single command (everything after `--`) and exit.
-- `busybar cli -i -- device_info` — run the command, then **stay** in the interactive session
-  (same connection; `-i` only applies to the `--` form, which needs a real terminal).
-- `echo device_info | busybar cli` — run commands from stdin (one per line) and exit.
-- `busybar cli < script.txt` — run a multi-line command list and exit.
-- `--timeout SECONDS` — per-command response wait cap for the non-interactive runs (default: 5).
-
-### `busybar storage`
-
-Work with the device storage via the embedded storage.py tool. Pass the storage sub-command and its
-arguments after `--`; the device is selected with the usual `-d`/`-p`.
-
-- `busybar storage -d 10.0.4.20 -- list /ext`
-- `busybar storage -- send ./local.bin /ext/local.bin`
-
-Available storage sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`, `receive`, `send`, `list`.
+- `device_path` — on-device path to install from, or the literal `recovery` for the recovery
+  partition (default: the staged update dir).
 
 ### `busybar wait` / `busybar clean`
 

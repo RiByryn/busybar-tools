@@ -37,17 +37,11 @@ except Exception:
 
 TOP_EPILOG = """\
 examples:
-  busybar auto-install                     recommended: autodetect & install latest dev firmware
-  busybar auto-install 0.10.2              autodetect target/signing, install a specific tag
-  busybar install -t 22 --unsigned 0.10.2  low-level: install a specific tag for hw target 22
-  busybar write-recovery 0.10.2            store a bkp bundle into the recovery partition
-  busybar fetch 0.10.2 -o ~/fw/            download a bundle into a local directory
-  busybar install-onboard recovery         install firmware already on the device's recovery
-  busybar cli -d 10.0.5.20                 open a CLI terminal session to the device
-  busybar storage -d 10.0.4.20 -- list /ext
+  busybar auto-install          autodetect & install the latest dev firmware (recommended)
+  busybar auto-install 0.10.2   install a specific tag
 
-Most users want `busybar auto-install`. The other commands are explicit/low-level.
-Use `busybar <command> --help` for command-specific options.
+Most users want `busybar auto-install`. Other commands are explicit/low-level —
+run `busybar <command> --help` for details.
 """
 
 # `source` accepts (resolved in this priority order):
@@ -125,9 +119,8 @@ def busybar_main():
         "auto-install",
         parents=[device_opts],
         help="Automatic install for regular users (autodetects target & signing)",
-        description="Read the device info, autodetect the hardware target and whether signed "
-                    "firmware is required, then fetch and install the matching update bundle and "
-                    "report the version change. The source must be an update-server tag/branch or URL.",
+        description="Autodetect the device's target and signing, fetch the matching update bundle, "
+                    "install it, then report the version change. Source: update-server tag/branch or URL.",
     )
     
     # Transport: storage (default) vs http.
@@ -150,8 +143,7 @@ def busybar_main():
                     "  busybar cli                       interactive session (Ctrl+] to exit)\n"
                     "  busybar cli -- device_info        run one command and exit\n"
                     "  busybar cli -i -- device_info     run one command, then stay interactive\n"
-                    "  echo device_info | busybar cli    run commands from stdin (one per line) and exit\n"
-                    "  busybar cli < script.txt          run a multi-line command list and exit",
+                    "  echo device_info | busybar cli    run commands from stdin (one per line) and exit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_run_cli.add_argument("-i", "--interactive", dest="interactive", action="store_true", help="After running commands from arguments, stay in the interactive session (args form only)")
@@ -201,9 +193,8 @@ def busybar_main():
         "write-recovery",
         parents=[_make_firmware_opts(), device_opts, no_wait_opts],
         help="Write a firmware bundle into the device recovery partition (without installing)",
-        description="Resolve a firmware source and store it into the recovery partition (/bkp), "
-                    "WITHOUT installing it. Defaults to the --bkp bundle type (purpose-built for "
-                    "recovery). DANGER: an incorrect bundle here can brick the device.",
+        description="Store a firmware bundle into the recovery partition (/bkp) WITHOUT installing it. "
+                    "Defaults to --bkp. DANGER: a wrong bundle can brick the device.",
     )
     p_write_recovery.add_argument("--confirm-timeout", dest="recovery_timeout", metavar="SECONDS", type=int, default=3, help="Countdown (seconds) before overwriting the recovery partition")
     # The recovery partition expects a bkp-type bundle, so default to --bkp here.

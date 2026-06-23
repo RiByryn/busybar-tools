@@ -92,4 +92,4 @@ def test_command_registration_order(monkeypatch, capsys):
     with pytest.raises(SystemExit):
         run_cli(monkeypatch, ["--help"])
     out = capsys.readouterr().out
-    assert "{auto-install,install,write-recovery,fetch,install-onboard,cli,wait,clean,storage}" in out
+    assert "{auto-install,cli,storage,install,fetch,write-recovery,install-onboard,wait,clean}" in out
