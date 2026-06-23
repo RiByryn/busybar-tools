@@ -182,8 +182,18 @@ To install *from* the recovery partition afterwards, use `busybar install-onboar
 
 ### `busybar cli`
 
-- `busybar cli` — start a terminal session to the device. Press `Ctrl+]` to exit.
+A terminal session to the device, or non-interactive command execution.
+
+    busybar cli [-i] [--timeout SECONDS] [-d DEVICE] [-p PORT] [-- COMMAND ...]
+
+- `busybar cli` — interactive session. Press `Ctrl+]` to exit.
 - `busybar cli -d 10.0.5.20 -p 23` — connect to a custom IP address and port.
+- `busybar cli -- device_info` — run a single command (everything after `--`) and exit.
+- `busybar cli -i -- device_info` — run the command, then **stay** in the interactive session
+  (same connection; `-i` only applies to the `--` form, which needs a real terminal).
+- `echo device_info | busybar cli` — run commands from stdin (one per line) and exit.
+- `busybar cli < script.txt` — run a multi-line command list and exit.
+- `--timeout SECONDS` — per-command response wait cap for the non-interactive runs (default: 5).
 
 ### `busybar storage`
 
@@ -219,6 +229,9 @@ Available storage sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`,
   removed; it now lives in `auto-install`).
 - `-t/--target` is no longer restricted to a fixed list — it accepts any integer target supported by
   the update server (default still `22`).
+- `busybar cli` can now run commands non-interactively: from arguments (`cli -- device_info`) or from
+  stdin (`echo device_info | busybar cli`, one command per line). With `-i`, an argument command runs
+  and then drops into the interactive session on the same connection.
 - CLI restructure for clarity and consistency (**breaking change**):
     - Options are now scoped to the command they affect and go **after** the command
       (e.g. `busybar install -t 21 dev` instead of `busybar -t 21 install`). `-d`/`-p`/`-t` are no longer global.

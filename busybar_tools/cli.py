@@ -197,8 +197,19 @@ def busybar_main():
 
     # cli --------------------------------------------------------------------
     p_run_cli = subparsers.add_parser(
-        "cli", parents=[device_opts, no_wait_opts], help="CLI terminal session to the device"
+        "cli", parents=[device_opts, no_wait_opts],
+        help="CLI terminal session to the device",
+        description="Interactive CLI session, or run commands non-interactively:\n"
+                    "  busybar cli                       interactive session (Ctrl+] to exit)\n"
+                    "  busybar cli -- device_info        run one command and exit\n"
+                    "  busybar cli -i -- device_info     run one command, then stay interactive\n"
+                    "  echo device_info | busybar cli    run commands from stdin (one per line) and exit\n"
+                    "  busybar cli < script.txt          run a multi-line command list and exit",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    p_run_cli.add_argument("-i", "--interactive", dest="interactive", action="store_true", help="After running commands from arguments, stay in the interactive session (args form only)")
+    p_run_cli.add_argument("--timeout", dest="timeout", metavar="SECONDS", type=int, default=5, help="Per-command response wait cap for non-interactive runs (default: 5)")
+    p_run_cli.add_argument("cli_args", nargs=argparse.REMAINDER, help="Command to run, after `--` (e.g. -- sysctl debug 1)")
     p_run_cli.set_defaults(func=run_cli_terminal)
 
     # wait -------------------------------------------------------------------
@@ -246,7 +257,7 @@ def main():
 
     try:
         ret = busybar_main()
-        print("RET: ", ret)
+        # print("RET: ", ret)
         if ret and ret != 0:
             print("Run: Exiting with error code", ret, file=sys.stderr)
             sys.exit(1)
