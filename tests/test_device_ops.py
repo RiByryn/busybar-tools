@@ -81,3 +81,45 @@ def test_device_read_info_raises_after_retries(monkeypatch):
     monkeypatch.setattr(bt, "BSB_Lite", Boom)
     with pytest.raises(RuntimeError):
         bt.device_read_info("10.0.0.9", 23, retries=3, delay=0)
+
+
+def _fake_bsb_returning(responses):
+    """Build a BSB_Lite stub that yields successive device_info() dicts from `responses`."""
+    seq = iter(responses)
+
+    class FakeBSB:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def device_info(self):
+            return next(seq)
+
+    return FakeBSB
+
+
+def test_device_read_info_polls_until_complete(monkeypatch):
+    monkeypatch.setattr(bt.time, "sleep", lambda *_: None)
+    partial = {"u5_firmware_branch": "dev", "u5_firmware_commit": "aaaa", "u5_firmware_builddate": "2026-06-17"}
+    complete = dict(partial, sl_firmware_branch="dev", sl_firmware_commit="aaaa", sl_firmware_builddate="2026-06-17")
+    monkeypatch.setattr(bt, "BSB_Lite", _fake_bsb_returning([dict(partial), dict(partial), dict(complete)]))
+
+    info = bt.device_read_info("10.0.0.1", 23, retries=10, delay=0, required_keys=bt._VERSION_FIELDS)
+    assert info.get("sl_firmware_commit") == "aaaa"
+    assert bt._device_info_ready(info, bt._VERSION_FIELDS)
+
+
+def test_device_read_info_returns_partial_after_budget(monkeypatch):
+    monkeypatch.setattr(bt.time, "sleep", lambda *_: None)
+    partial = {"u5_firmware_branch": "dev", "u5_firmware_commit": "aaaa", "u5_firmware_builddate": "2026-06-17"}
+    # Always incomplete (no sl_* fields).
+    monkeypatch.setattr(bt, "BSB_Lite", _fake_bsb_returning([dict(partial)] * 5))
+
+    info = bt.device_read_info("10.0.0.1", 23, retries=3, delay=0, required_keys=bt._VERSION_FIELDS)
+    assert info.get("u5_firmware_commit") == "aaaa"
+    assert not bt._device_info_ready(info, bt._VERSION_FIELDS)  # partial, but returned (no raise)

@@ -366,19 +366,42 @@ def _place_result(src_path, output):
     return dst
 
 
-def device_read_info(device, port, retries=1, delay=2):
-    """Connect to the device CLI and return the parsed device_info dict (with retries)."""
-    last = None
+def _device_info_ready(info, required_keys):
+    """True if all required device_info keys are present and non-empty."""
+    return all(info.get(k) for k in required_keys)
+
+
+def device_read_info(device, port, retries=1, delay=1, required_keys=None):
+    """Connect to the device CLI and return the parsed device_info dict.
+
+    Retries both on connection errors AND, when `required_keys` is given, until those keys
+    are populated: after a reboot the U5 CLI answers quickly but the SL co-processor reports
+    its fields (sl_firmware_*, sl_intercom_status) a bit later, so a bare read can return a
+    partial dict. If the data is still incomplete once retries are exhausted, the last partial
+    dict is returned (with a warning) rather than failing. Raises only if no read ever succeeded.
+    """
+    last_info = None
+    last_err = None
     for attempt in range(retries):
         try:
             with BSB_Lite((device, port)) as bsb:
-                return bsb.device_info()
+                info = bsb.device_info()
+            last_info = info
+            if not required_keys or _device_info_ready(info, required_keys):
+                return info
+            missing = [k for k in required_keys if not info.get(k)]
+            logging.debug(f"device_info incomplete (missing {missing}), attempt {attempt + 1}/{retries}")
         except Exception as e:
-            last = e
+            last_err = e
             logging.debug(f"device_info attempt {attempt + 1}/{retries} failed: {e}")
-            if attempt + 1 < retries:
-                time.sleep(delay)
-    raise RuntimeError(f"Failed to read device_info from {device}:{port}: {last}")
+        if attempt + 1 < retries:
+            time.sleep(delay)
+
+    if last_info is not None:
+        if required_keys and not _device_info_ready(last_info, required_keys):
+            logging.warning("device_info still incomplete after retries; reporting partial data.")
+        return last_info
+    raise RuntimeError(f"Failed to read device_info from {device}:{port}: {last_err}")
 
 
 def _device_info_bool(info, key):
@@ -416,6 +439,9 @@ _VERSION_FIELDS = (
     "sl_firmware_branch", "sl_firmware_commit", "sl_firmware_builddate",
 )
 
+# Fields needed to autodetect target & signing (also gate "device fully booted").
+_DETECT_FIELDS = ("u5_firmware_target", "sl_nwp_secureboot", "sl_m4_secureboot")
+
 
 def device_version_fingerprint(info):
     """Tuple of version-identifying fields, for before/after comparison."""
@@ -451,8 +477,11 @@ def run_auto_install(args):
 
     wait_for_device_maybe(args)
 
-    logging.info("Reading device info...")
-    info_before = device_read_info(args.device, args.port)
+    logging.info(f"Reading device info from {args.device}:{args.port}...")
+    info_before = device_read_info(
+        args.device, args.port,
+        retries=5, delay=2, required_keys=_VERSION_FIELDS + _DETECT_FIELDS,
+    )
 
     target = device_info_target(info_before)
     signed = device_info_signed(info_before)
@@ -480,7 +509,10 @@ def run_auto_install(args):
     wait_for_device(args.device, timeout=60, verbose=args.verbose, success_ping_as=False)
     wait_for_device(args.device, verbose=args.verbose)
 
-    info_after = device_read_info(args.device, args.port, retries=5, delay=2)
+    info_after = device_read_info(
+        args.device, args.port,
+        retries=20, delay=2, required_keys=_VERSION_FIELDS,
+    )
 
     if device_version_fingerprint(info_before) == device_version_fingerprint(info_after):
         print(f"Already up to date — reinstalled the same build:\n  {format_version(info_after)}")
