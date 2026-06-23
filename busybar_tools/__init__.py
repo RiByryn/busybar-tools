@@ -140,8 +140,10 @@ def busybar_storage_verify_dir_on_device(device, dir_src, dir_dst):
             for root, _, files in os.walk(dir_src):
                 for file in files:
                     local_file = os.path.join(root, file)
-                    rel_path = os.path.relpath(local_file, dir_src)
-                    
+                    # Normalize to forward slashes so keys match the device side (which uses '/');
+                    # on Windows os.path.relpath returns backslash-separated paths.
+                    rel_path = os.path.relpath(local_file, dir_src).replace(os.sep, "/")
+
                     if rel_path in device_files:
                         device_size = device_files[rel_path]
                         local_size = os.path.getsize(local_file)
