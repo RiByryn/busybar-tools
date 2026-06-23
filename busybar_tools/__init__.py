@@ -289,18 +289,24 @@ def busybar_download_file_by_filetype(source_url, file_type, work_dir, index_par
     for file in index_parsed:
         if file["file_type"] == file_type:
             file_path = os.path.join(work_dir, file['file_name'])
-            if file_sha256(file_path) != file["sha256sum"]:
-                logging.warning(f"File missing or Hash check failed: {file['file_name']}")
 
+            if not os.path.exists(file_path):
                 file_path = file_download(file["file_url"], file['file_name'], work_dir, progress=True)
             
-            if file_sha256(file_path) == file["sha256sum"]:
+            file_hash = file_sha256(file_path)
+
+            if file_hash != file["sha256sum"]:
+                logging.warning(f"File Hash check failed: {file['file_name']}")
+                file_path = file_download(file["file_url"], file['file_name'], work_dir, progress=True)
+                file_hash = file_sha256(file_path)
+
+            if file_hash == file["sha256sum"]:
                 logging.info(f"Hash check passed: {file['file_name']}: {file['sha256sum']}")
             else:
-                logging.error(f"Hash check failed ONCE AGAIN: {file['file_name']}: {file['sha256sum']}")
+                logging.error(f"File Hash check failed ONCE AGAIN: {file['file_name']}: {file['sha256sum']}")
             break
     if file_path is None:
-        logging.error(f"Failed to find file of type {file_type} in index!")
+        logging.warning(f"Failed to find file of type {file_type} in index!")
     
     return file_path
 
