@@ -276,7 +276,7 @@ def busybar_api_update(device_ip, upd_bundle_tar, verbose=True):
                 percent = int(sent * 100 / total_size) if total_size else 100
                 if percent != last_percent:
                     if verbose:
-                        print(f"\rUpload progress: {percent:3d}%", end="", file=sys.stdout, flush=True)
+                        print(f"\rUpload via HTTP: {percent:3d}%", end="", file=sys.stdout, flush=True)
                     last_percent = percent
 
         if last_percent >= 0:

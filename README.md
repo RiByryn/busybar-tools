@@ -55,7 +55,7 @@ Device-facing commands (`auto-install`, `install`, `install-onboard`, `cli`, `wa
 - `-d`, `--device DEVICE` — device IP address (USB LAN or Wi-Fi). `r`/`ref` selects the reference device.
 - `-p`, `--port PORT` — device TCP port (default: 23).
 - `--no-wait` — skip the device reachability (ping) check that normally runs before the operation
-  (available on every device-facing command except `wait` and `auto-install`).
+  (available on every device-facing command except `wait`).
 
 ### `busybar auto-install`
 
@@ -63,18 +63,24 @@ The recommended path for regular users. It connects to the device, reads its inf
 hardware target and whether signed firmware is required**, then fetches the matching regular update
 bundle and installs it — finally waiting for the reboot and reporting the version change.
 
-    busybar auto-install [-d DEVICE] [-p PORT] [source]
+    busybar auto-install [--via-storage | --via-http] [--no-wait] [--no-wait-after]
+                         [-d DEVICE] [-p PORT] [source]
 
 - `source` — an update-server tag/branch or URL (default: `dev`). Local files/directories are **not**
   accepted here, since the right bundle is chosen automatically from the server for the detected
   target/signing — use `install` for a local source.
-- No firmware-selection flags (`-t`, `--signed`, `--bkp`, …): everything is autodetected. For manual
-  control use `install`.
+- No firmware-selection flags (`-t`, `--signed`, `--bkp`, …): target and signing are autodetected
+  from the device. For manual control use `install`.
+- `--via-storage` | `--via-http` — delivery transport (default `--via-storage`), same as `install`.
+- `--no-wait` — skip the reachability check **before** reading the device.
+- `--no-wait-after` — skip waiting for the device to reboot and come back **after** install (by
+  default it waits and reports the version change; with this flag it returns right after install).
 
 Examples:
 - `busybar auto-install` — install the latest `dev` firmware appropriate for the device.
 - `busybar auto-install 0.10.2` — install a specific tag, autodetecting target and signing.
 - `busybar auto-install -d 10.0.5.20` — target a device with a custom IP.
+- `busybar auto-install --via-http --no-wait-after dev` — install over HTTP, don't wait for the reboot.
 
 ### `busybar install`
 
@@ -207,6 +213,8 @@ Available storage sub-commands: `mkdir`, `format_ext`, `remove`, `read`, `size`,
 - New `busybar auto-install` command — the recommended path for regular users: it reads the device
   info, autodetects the hardware target and whether signed firmware is required, fetches the matching
   update bundle, installs it, and reports the version change. Accepts only an update-server tag/branch/URL.
+  Supports `--via-storage`/`--via-http`, `--no-wait` (skip the pre-check) and `--no-wait-after`
+  (skip waiting for the reboot afterwards).
 - `install` / `fetch` / `write-recovery` now **require an explicit `source`** (the `dev` default was
   removed; it now lives in `auto-install`).
 - `-t/--target` is no longer restricted to a fixed list — it accepts any integer target supported by

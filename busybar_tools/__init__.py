@@ -447,7 +447,7 @@ def run_auto_install(args):
         )
         return 1
 
-    wait_for_device(args.device, verbose=args.verbose)
+    wait_for_device_maybe(args)
 
     logging.info("Reading device info...")
     info_before = device_read_info(args.device, args.port)
@@ -463,12 +463,15 @@ def run_auto_install(args):
     args.target = target
     args.signed = signed
     args.update_bundle_type = "update"
-    args.via_storage = True
     args.invoke_update = True
 
     ret = run_install(args)
     if ret:
         return ret
+    
+    if getattr(args, "no_wait_after", False):
+        logging.info("Skipping device reachability check after install (--no-wait-after).")
+        return 0
 
     logging.info("Waiting for the device to reboot and come back...")
     # First let it go offline (bounded), then wait for it to be reachable again.

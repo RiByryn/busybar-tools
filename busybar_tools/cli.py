@@ -129,6 +129,16 @@ def busybar_main():
                     "firmware is required, then fetch and install the matching update bundle and "
                     "report the version change. The source must be an update-server tag/branch or URL.",
     )
+    
+    # Transport: storage (default) vs http.
+    transport_group = p_auto.add_argument_group("delivery / transport")
+    transport_mx = transport_group.add_mutually_exclusive_group()
+    transport_mx.add_argument("--via-storage", dest="via_storage", action="store_true", help="Deliver via storage.py protocol (default)", default=True)
+    transport_mx.add_argument("--via-http", dest="via_storage", action="store_false", help="Deliver via HTTP API (direct install only)")
+
+    p_auto.add_argument("--no-wait", dest="no_wait", action="store_true", help="Skip the device reachability (ping) check before the operation")
+    p_auto.add_argument("--no-wait-after", dest="no_wait_after", action="store_true", help="Skip the device reachability (ping) check after the operation (default: wait for device to come back online)")
+
     p_auto.add_argument("source", help=f"Update-server tag/branch or URL (default: {UPDATE_DEFAULT_BRANCH})", type=str, default=UPDATE_DEFAULT_BRANCH, nargs="?")
     p_auto.set_defaults(func=run_auto_install)
 
